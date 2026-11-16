@@ -2648,3 +2648,278 @@ expression tmp_MeanWealthRoundingExceptions =
 
 	annotation PBI_ResultType = Exception
 
+expression tmp_MeanWealthPrecisionDiagnostic =
+		let
+		    Source =
+		        tmp_CountryMetricReconciliation,
+		
+		    // Keep the three affected countries
+		    Exceptions =
+		        Table.SelectRows(
+		            Source,
+		            each
+		                List.Contains(
+		                    {"GEO", "PER", "EST"},
+		                    [iso3]
+		                )
+		        ),
+		
+		    // Show 17 significant digits
+		    SourceRaw =
+		        Table.AddColumn(
+		            Exceptions,
+		            "Source_G17",
+		            each Number.ToText(
+		                [mean_wealth_usd_m],
+		                "G17",
+		                "en-US"
+		            ),
+		            type text
+		        ),
+		
+		    CalculatedRaw =
+		        Table.AddColumn(
+		            SourceRaw,
+		            "Calculated_G17",
+		            each Number.ToText(
+		                [Calculated_Mean_Wealth_USD_M],
+		                "G17",
+		                "en-US"
+		            ),
+		            type text
+		        ),
+		
+		    Difference =
+		        Table.AddColumn(
+		            CalculatedRaw,
+		            "Difference_G17",
+		            each Number.ToText(
+		                [mean_wealth_usd_m]
+		                - [Calculated_Mean_Wealth_USD_M],
+		                "G17",
+		                "en-US"
+		            ),
+		            type text
+		        ),
+		
+		    Equality =
+		        Table.AddColumn(
+		            Difference,
+		            "Values_Equal",
+		            each
+		                [mean_wealth_usd_m]
+		                = [Calculated_Mean_Wealth_USD_M],
+		            type logical
+		        ),
+		
+		    // Explicit rounding modes
+		    SourceToEven =
+		        Table.AddColumn(
+		            Equality,
+		            "Source_ToEven",
+		            each Number.Round(
+		                [mean_wealth_usd_m],
+		                2,
+		                RoundingMode.ToEven
+		            ),
+		            type number
+		        ),
+		
+		    CalculatedToEven =
+		        Table.AddColumn(
+		            SourceToEven,
+		            "Calculated_ToEven",
+		            each Number.Round(
+		                [Calculated_Mean_Wealth_USD_M],
+		                2,
+		                RoundingMode.ToEven
+		            ),
+		            type number
+		        ),
+		
+		    SourceAway =
+		        Table.AddColumn(
+		            CalculatedToEven,
+		            "Source_AwayFromZero",
+		            each Number.Round(
+		                [mean_wealth_usd_m],
+		                2,
+		                RoundingMode.AwayFromZero
+		            ),
+		            type number
+		        ),
+		
+		    CalculatedAway =
+		        Table.AddColumn(
+		            SourceAway,
+		            "Calculated_AwayFromZero",
+		            each Number.Round(
+		                [Calculated_Mean_Wealth_USD_M],
+		                2,
+		                RoundingMode.AwayFromZero
+		            ),
+		            type number
+		        ),
+		
+		    Output =
+		        Table.SelectColumns(
+		            CalculatedAway,
+		            {
+		                "country",
+		                "iso3",
+		                "Source_G17",
+		                "Calculated_G17",
+		                "Difference_G17",
+		                "Values_Equal",
+		                "Source_ToEven",
+		                "Calculated_ToEven",
+		                "Source_AwayFromZero",
+		                "Calculated_AwayFromZero"
+		            }
+		        )
+		in
+		    Output
+	lineageTag: 11fb4528-40cb-4812-96dc-478161addeaa
+	queryGroup: 99_Archive
+
+	annotation PBI_ResultType = Table
+
+expression tmp_MeanWealthTypeAudit =
+		let
+		    Source =
+		        tmp_CountryMetricReconciliation,
+		
+		    DescribeType = (InputValue as any) as text =>
+		        if InputValue = null then
+		            "null"
+		        else
+		            let
+		                ValueType = Value.Type(InputValue),
+		                BaseType =
+		                    if Type.Is(ValueType, Currency.Type) then "Currency.Type"
+		                    else if Type.Is(ValueType, Decimal.Type) then "Decimal.Type"
+		                    else if Type.Is(ValueType, Int64.Type) then "Int64.Type"
+		                    else if Type.Is(ValueType, Int32.Type) then "Int32.Type"
+		                    else if Type.Is(ValueType, Int16.Type) then "Int16.Type"
+		                    else if Type.Is(ValueType, Byte.Type) then "Byte.Type"
+		                    else if Type.Is(ValueType, Percentage.Type) then "Percentage.Type"
+		                    else if Type.Is(ValueType, Double.Type) then "Double.Type"
+		                    else if Type.Is(ValueType, type number) then "number"
+		                    else if Type.Is(ValueType, type text) then "text"
+		                    else if Type.Is(ValueType, type logical) then "logical"
+		                    else if Type.Is(ValueType, type date) then "date"
+		                    else if Type.Is(ValueType, type datetime) then "datetime"
+		                    else if Type.Is(ValueType, type datetimezone) then "datetimezone"
+		                    else if Type.Is(ValueType, type time) then "time"
+		                    else if Type.Is(ValueType, type duration) then "duration"
+		                    else if Type.Is(ValueType, type binary) then "binary"
+		                    else if Type.Is(ValueType, type list) then "list"
+		                    else if Type.Is(ValueType, type record) then "record"
+		                    else if Type.Is(ValueType, type table) then "table"
+		                    else if Type.Is(ValueType, type function) then "function"
+		                    else if Type.Is(ValueType, type type) then "type"
+		                    else "any",
+		                Facets = Type.Facets(ValueType),
+		                FacetNames = Record.FieldNames(Facets),
+		                FacetSuffix =
+		                    if List.IsEmpty(FacetNames) then
+		                        ""
+		                    else
+		                        " ["
+		                            & Text.Combine(
+		                                List.Transform(
+		                                    FacetNames,
+		                                    each _ & "=" & (try Text.From(Record.Field(Facets, _)) otherwise "complex")
+		                                ),
+		                                ", "
+		                            )
+		                            & "]"
+		            in
+		                BaseType & FacetSuffix,
+		
+		    Exceptions =
+		        Table.SelectRows(
+		            Source,
+		            each List.Contains(
+		                {"GEO", "PER", "EST"},
+		                [iso3]
+		            )
+		        ),
+		
+		    AddDiagnostics =
+		        Table.AddColumn(
+		            Exceptions,
+		            "Diagnostics",
+		            each
+		                let
+		                    SourceValue = [mean_wealth_usd_m],
+		                    CalculatedValue = [Calculated_Mean_Wealth_USD_M],
+		                    SourceNumber = Number.From(SourceValue),
+		                    CalculatedNumber = Number.From(CalculatedValue),
+		                    SourceCurrency =
+		                        Currency.From(
+		                            SourceValue,
+		                            "en-US",
+		                            RoundingMode.ToEven
+		                        ),
+		                    CalculatedCurrency =
+		                        Currency.From(
+		                            CalculatedValue,
+		                            "en-US",
+		                            RoundingMode.ToEven
+		                        )
+		                in
+		                    [
+		                        Source_Type = DescribeType(SourceValue),
+		                        Calculated_Type = DescribeType(CalculatedValue),
+		                        Source_G29 = Number.ToText(SourceNumber, "G29", "en-US"),
+		                        Calculated_G29 = Number.ToText(CalculatedNumber, "G29", "en-US"),
+		                        Number_Equality = SourceNumber = CalculatedNumber,
+		                        Source_Round = Number.Round(SourceNumber, 2, RoundingMode.ToEven),
+		                        Calculated_Round = Number.Round(CalculatedNumber, 2, RoundingMode.ToEven),
+		                        Source_Currency_Round = Number.Round(SourceCurrency, 2, RoundingMode.ToEven),
+		                        Calculated_Currency_Round = Number.Round(CalculatedCurrency, 2, RoundingMode.ToEven)
+		                    ],
+		            type record
+		        ),
+		
+		    Expanded =
+		        Table.ExpandRecordColumn(
+		            AddDiagnostics,
+		            "Diagnostics",
+		            {
+		                "Source_Type",
+		                "Calculated_Type",
+		                "Source_G29",
+		                "Calculated_G29",
+		                "Number_Equality",
+		                "Source_Round",
+		                "Calculated_Round",
+		                "Source_Currency_Round",
+		                "Calculated_Currency_Round"
+		            }
+		        ),
+		
+		    Output =
+		        Table.SelectColumns(
+		            Expanded,
+		            {
+		                "country",
+		                "Source_Type",
+		                "Calculated_Type",
+		                "Source_G29",
+		                "Calculated_G29",
+		                "Number_Equality",
+		                "Source_Round",
+		                "Calculated_Round",
+		                "Source_Currency_Round",
+		                "Calculated_Currency_Round"
+		            }
+		        )
+		in
+		    Output
+	lineageTag: 7c573f53-2fc0-4717-b66b-40c53029b349
+	queryGroup: 99_Archive
+
+	annotation PBI_ResultType = Table
+
