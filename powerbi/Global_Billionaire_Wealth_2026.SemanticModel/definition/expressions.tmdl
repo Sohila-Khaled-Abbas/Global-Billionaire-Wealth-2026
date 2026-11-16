@@ -1959,3 +1959,81 @@ expression tmp_RankTieAuditSummary =
 
 	annotation PBI_ResultType = Table
 
+expression tmp_AgeBirthYearAudit =
+		let
+		    Source =
+		        stg_BillionaireIndividual,
+		
+		    SnapshotYear =
+		        Date.Year(p_SnapshotDate),
+		
+		    // Calculate age plausibility using birth year
+		    AddAgeStatus =
+		        Table.AddColumn(
+		            Source,
+		            "Age_BirthYear_Status",
+		            each
+		                let
+		                    Age = [age],
+		                    BirthYear = [birth_year],
+		
+		                    MinimumPlausibleAge =
+		                        if BirthYear = null then
+		                            null
+		                        else
+		                            SnapshotYear - BirthYear - 1,
+		
+		                    MaximumPlausibleAge =
+		                        if BirthYear = null then
+		                            null
+		                        else
+		                            SnapshotYear - BirthYear
+		
+		                in
+		                    if Age = null and BirthYear = null then
+		                        "Both missing"
+		
+		                    else if Age = null then
+		                        "Age missing"
+		
+		                    else if BirthYear = null then
+		                        "Birth year missing"
+		
+		                    else if BirthYear > SnapshotYear then
+		                        "Future birth year"
+		
+		                    else if Age < MinimumPlausibleAge
+		                        or Age > MaximumPlausibleAge then
+		                        "Age mismatch"
+		
+		                    else
+		                        "Plausible",
+		            type text
+		        ),
+		
+		    // Summarize validation results
+		    Summary =
+		        Table.Group(
+		            AddAgeStatus,
+		            {"Age_BirthYear_Status"},
+		            {
+		                {
+		                    "Record_Count",
+		                    each Table.RowCount(_),
+		                    Int64.Type
+		                }
+		            }
+		        ),
+		
+		    Sorted =
+		        Table.Sort(
+		            Summary,
+		            {{"Record_Count", Order.Descending}}
+		        )
+		in
+		    Sorted
+	lineageTag: 57a96d7d-2cd3-46a6-a4f3-c509dff03164
+	queryGroup: 99_Archive
+
+	annotation PBI_ResultType = Table
+
