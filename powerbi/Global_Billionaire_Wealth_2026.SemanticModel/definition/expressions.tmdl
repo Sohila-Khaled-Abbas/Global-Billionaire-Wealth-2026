@@ -2188,3 +2188,221 @@ expression tmp_CountryNumericAudit =
 
 	annotation PBI_ResultType = Table
 
+expression tmp_CountryMetricReconciliation =
+		let
+		    // 1. Source
+		    Source =
+		        stg_BillionaireCountry,
+		
+		    // 2. Calculate expected metrics independently
+		    AddCalculatedMean =
+		        Table.AddColumn(
+		            Source,
+		            "Calculated_Mean_Wealth_USD_M",
+		            each [total_wealth_usd_m]
+		                / [billionaire_count],
+		            type number
+		        ),
+		
+		    AddCalculatedSelfMade =
+		        Table.AddColumn(
+		            AddCalculatedMean,
+		            "Calculated_SelfMade_Ratio_Pct",
+		            each [self_made_count]
+		                / [billionaire_count] * 100,
+		            type number
+		        ),
+		
+		    AddCalculatedDensity =
+		        Table.AddColumn(
+		            AddCalculatedSelfMade,
+		            "Calculated_Billionaires_Per_Million",
+		            each [billionaire_count]
+		                / [population] * 1000000,
+		            type number
+		        ),
+		
+		    AddCalculatedWealthGDP =
+		        Table.AddColumn(
+		            AddCalculatedDensity,
+		            "Calculated_Wealth_GDP_Pct",
+		            each [total_wealth_usd]
+		                / [gdp_usd] * 100,
+		            type number
+		        ),
+		
+		    AddCalculatedGDPPerBillionaire =
+		        Table.AddColumn(
+		            AddCalculatedWealthGDP,
+		            "Calculated_GDP_Per_Billionaire_Bn",
+		            each [gdp_usd]
+		                / [billionaire_count]
+		                / 1000000000,
+		            type number
+		        ),
+		
+		    // 3. Compare actual and calculated metrics
+		    AddMeanDifference =
+		        Table.AddColumn(
+		            AddCalculatedGDPPerBillionaire,
+		            "Mean_Wealth_Difference",
+		            each Number.Abs(
+		                [mean_wealth_usd_m]
+		                - [Calculated_Mean_Wealth_USD_M]
+		            ),
+		            type number
+		        ),
+		
+		    AddSelfMadeDifference =
+		        Table.AddColumn(
+		            AddMeanDifference,
+		            "SelfMade_Ratio_Difference",
+		            each Number.Abs(
+		                [self_made_ratio_pct]
+		                - [Calculated_SelfMade_Ratio_Pct]
+		            ),
+		            type number
+		        ),
+		
+		    AddDensityDifference =
+		        Table.AddColumn(
+		            AddSelfMadeDifference,
+		            "Density_Difference",
+		            each Number.Abs(
+		                [billionaires_per_million_pop]
+		                - [Calculated_Billionaires_Per_Million]
+		            ),
+		            type number
+		        ),
+		
+		    AddWealthGDPDifference =
+		        Table.AddColumn(
+		            AddDensityDifference,
+		            "Wealth_GDP_Difference",
+		            each Number.Abs(
+		                [country_wealth_gdp_pct]
+		                - [Calculated_Wealth_GDP_Pct]
+		            ),
+		            type number
+		        ),
+		
+		    AddGDPDifference =
+		        Table.AddColumn(
+		            AddWealthGDPDifference,
+		            "GDP_Per_Billionaire_Difference",
+		            each Number.Abs(
+		                [gdp_per_billionaire_bn]
+		                - [Calculated_GDP_Per_Billionaire_Bn]
+		            ),
+		            type number
+		        ),
+		
+		    // 4. Select audit fields
+		    Output =
+		        Table.SelectColumns(
+		            AddGDPDifference,
+		            {
+		                "country",
+		                "iso3",
+		                "billionaire_count",
+		
+		                "mean_wealth_usd_m",
+		                "Calculated_Mean_Wealth_USD_M",
+		                "Mean_Wealth_Difference",
+		
+		                "self_made_ratio_pct",
+		                "Calculated_SelfMade_Ratio_Pct",
+		                "SelfMade_Ratio_Difference",
+		
+		                "billionaires_per_million_pop",
+		                "Calculated_Billionaires_Per_Million",
+		                "Density_Difference",
+		
+		                "country_wealth_gdp_pct",
+		                "Calculated_Wealth_GDP_Pct",
+		                "Wealth_GDP_Difference",
+		
+		                "gdp_per_billionaire_bn",
+		                "Calculated_GDP_Per_Billionaire_Bn",
+		                "GDP_Per_Billionaire_Difference"
+		            }
+		        )
+		in
+		    Output
+	lineageTag: b6d032fe-1070-464c-8c60-3e7846117829
+	queryGroup: '05_QA & Reconciliation'
+
+	annotation PBI_ResultType = Table
+
+expression tmp_CountryMetricReconciliationSummary =
+		let
+		    Source =
+		        tmp_CountryMetricReconciliation,
+		
+		    Metrics = {
+		        [
+		            Metric = "Mean wealth",
+		            DifferenceColumn = "Mean_Wealth_Difference"
+		        ],
+		        [
+		            Metric = "Self-made ratio",
+		            DifferenceColumn = "SelfMade_Ratio_Difference"
+		        ],
+		        [
+		            Metric = "Billionaire density",
+		            DifferenceColumn = "Density_Difference"
+		        ],
+		        [
+		            Metric = "Wealth-to-GDP",
+		            DifferenceColumn = "Wealth_GDP_Difference"
+		        ],
+		        [
+		            Metric = "GDP per billionaire",
+		            DifferenceColumn = "GDP_Per_Billionaire_Difference"
+		        ]
+		    },
+		
+		    SummaryRecords =
+		        List.Transform(
+		            Metrics,
+		            (MetricRecord) =>
+		                let
+		                    Values =
+		                        List.RemoveNulls(
+		                            Table.Column(
+		                                Source,
+		                                MetricRecord[DifferenceColumn]
+		                            )
+		                        ),
+		
+		                    MaximumDifference =
+		                        if List.IsEmpty(Values)
+		                        then null
+		                        else List.Max(Values),
+		
+		                    CountriesAbove001 =
+		                        List.Count(
+		                            List.Select(
+		                                Values,
+		                                each _ > 0.01
+		                            )
+		                        )
+		                in
+		                    [
+		                        Metric = MetricRecord[Metric],
+		                        Maximum_Absolute_Difference =
+		                            MaximumDifference,
+		                        Countries_Above_001 =
+		                            CountriesAbove001
+		                    ]
+		        ),
+		
+		    Result =
+		        Table.FromRecords(SummaryRecords)
+		in
+		    Result
+	lineageTag: 0a9e9a37-f389-49cc-8e18-6103e9226b20
+	queryGroup: '05_QA & Reconciliation'
+
+	annotation PBI_ResultType = Table
+
