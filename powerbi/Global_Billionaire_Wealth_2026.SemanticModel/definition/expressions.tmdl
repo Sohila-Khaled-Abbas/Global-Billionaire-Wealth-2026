@@ -22,3 +22,19 @@ expression stg_BillionaireCountry =
 
 	annotation PBI_ResultType = Table
 
+/// Root directory containing the raw CSV source files
+expression p_DataFolderPath = "D:\courses\Data Analysis 26-27\Projects\Global-Billionaire-Wealth-2026\data\raw" meta [IsParameterQuery = true, IsParameterQueryRequired = false, Type = type text]
+	lineageTag: 0f8f4e14-084a-4e6f-bec3-9f5a358c0cc4
+	queryGroup: '00_Parameters & Functions'
+
+	annotation PBI_ResultType = Text
+
+/// Forbes real-time billionaire data collection date
+expression p_SnapshotDate =
+		let
+		    Source = #date(2026, 4, 10) meta [IsParameterQuery = true, IsParameterQueryRequired = false, Type = type date]
+		in
+		    Source
+	lineageTag: fbec51b0-f767-4b1c-9ad4-881658b8a8d1
+	queryGroup: '00_Parameters & Functions'
+
