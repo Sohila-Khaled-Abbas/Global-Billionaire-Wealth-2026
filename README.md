@@ -93,7 +93,6 @@ A streamlined, modern data pipeline transforming raw source dumps into interacti
 
 ```mermaid
 flowchart TD
-    %% Modern styling configuration
     classDef sourceStyle fill:#1E293B,stroke:#38BDF8,stroke-width:2px,color:#F8FAFC,rx:8,ry:8;
     classDef storageStyle fill:#0F172A,stroke:#F59E0B,stroke-width:2px,color:#F8FAFC,rx:8,ry:8;
     classDef engineStyle fill:#1E1E38,stroke:#10B981,stroke-width:2px,color:#F8FAFC,rx:8,ry:8;
@@ -101,9 +100,9 @@ flowchart TD
     classDef presentationStyle fill:#3B1124,stroke:#F43F5E,stroke-width:2px,color:#F8FAFC,rx:8,ry:8;
 
     subgraph S1["🌐 1. Ingestion Layer"]
-        A1["📦 Kaggle Raw Dataset<br/><code>kanchana1990/global-billionaire-wealth-2026</code>"]:::sourceStyle
-        A2["⚡ Forbes Real-Time Index<br/><code>Net Worth • Industry • Demographics</code>"]:::sourceStyle
-        A3["🏛️ World Bank Indicators<br/><code>Nominal GDP (USD) • Population</code>"]:::sourceStyle
+        A1["📦 Kaggle Raw Dataset<br/>kanchana1990/global-billionaire-wealth-2026"]:::sourceStyle
+        A2["⚡ Forbes Real-Time Index<br/>Net Worth • Industry • Demographics"]:::sourceStyle
+        A3["🏛️ World Bank Indicators<br/>Nominal GDP • Population"]:::sourceStyle
     end
 
     subgraph S2["💾 2. Raw Data Assets"]
@@ -112,14 +111,14 @@ flowchart TD
     end
 
     subgraph S3["⚙️ 3. Power Query & M Engine"]
-        C1["🧹 Type Casting & Normalization<br/><code>Int64, Double, Boolean, Text</code>"]:::engineStyle
-        C2["🔍 Edge Case Treatment<br/><code>Zero-Net-Worth Fallen Billionaires</code>"]:::engineStyle
+        C1["🧹 Type Casting & Normalization<br/>Int64, Double, Boolean, Text"]:::engineStyle
+        C2["🔍 Edge Case Treatment<br/>Zero-Net-Worth Fallen Billionaires"]:::engineStyle
     end
 
     subgraph S4["🧠 4. Semantic Layer (TMDL / PBIP)"]
         D1["📊 Country Aggregate Dimension (1)"]:::semanticStyle
         D2["👥 Individual Billionaire Fact (*)"]:::semanticStyle
-        D3["📐 High-Performance DAX Measures<br/><code>Wealth-to-GDP • Density • Oligarchy Index</code>"]:::semanticStyle
+        D3["📐 High-Performance DAX Measures<br/>Wealth-to-GDP • Density • Oligarchy Index"]:::semanticStyle
     end
 
     subgraph S5["📊 5. Analytical Visual Canvas"]
@@ -129,13 +128,22 @@ flowchart TD
         E4["📈 Demographic Age & Gender Matrix"]:::presentationStyle
     end
 
-    A1 & A2 & A3 --> B1 & B2
-    B1 --> C1 --> D2
-    B2 --> C1 --> D1
-    C2 --> D1 & D2
-    D1 ---|1 to Many (country)| D2
-    D1 & D2 --> D3
-    D3 --> E1 & E2 & E3 & E4
+    A1 --> B1
+    A2 --> B1
+    A3 --> B2
+    B1 --> C1
+    B2 --> C1
+    C1 --> D1
+    C1 --> D2
+    C2 --> D1
+    C2 --> D2
+    D1 -->|"1 to Many: country"| D2
+    D1 --> D3
+    D2 --> D3
+    D3 --> E1
+    D3 --> E2
+    D3 --> E3
+    D3 --> E4
 ```
 
 ---
@@ -146,7 +154,7 @@ The Power BI Semantic Model enforces a clean, high-performance dimensional schem
 
 ```mermaid
 erDiagram
-    billionaire_country_aggregate_2026 ||--o{ billionaire_individual_2026 : "1 to Many (country)"
+    billionaire_country_aggregate_2026 ||--o{ billionaire_individual_2026 : "country"
 
     billionaire_country_aggregate_2026 {
         int country_wealth_rank PK "Global wealth rank"
@@ -156,18 +164,18 @@ erDiagram
         int billionaire_count "Total resident billionaires"
         double total_wealth_usd_m "Aggregate wealth in USD Millions"
         int64 total_wealth_usd "Aggregate wealth in absolute USD"
-        double mean_wealth_usd_m "Mean net worth ($M)"
-        double median_wealth_usd_m "Median net worth ($M)"
-        double max_wealth_usd_m "Top billionaire net worth ($M)"
+        double mean_wealth_usd_m "Mean net worth in USD Millions"
+        double median_wealth_usd_m "Median net worth in USD Millions"
+        double max_wealth_usd_m "Top billionaire net worth in USD Millions"
         string top_billionaire "Wealthiest resident individual"
         string dominant_industry_by_wealth "Leading industry sector"
         int self_made_count "Count of self-made individuals"
-        double self_made_ratio_pct "Self-made proportion (%)"
+        double self_made_ratio_pct "Self-made proportion percentage"
         double mean_age "Average age of billionaires"
-        double country_wealth_gdp_pct "Total wealth as % of national GDP"
-        double billionaires_per_million_pop "Billionaire density per million"
+        double country_wealth_gdp_pct "Total wealth as percent of national GDP"
+        double billionaires_per_million_pop "Billionaire density per million residents"
         string wealth_concentration_tier "Macro exposure classification"
-        double gdp_per_billionaire_bn "National GDP per billionaire ($B)"
+        double gdp_per_billionaire_bn "National GDP per billionaire in USD Billions"
         double sector_dominance_score "Primary sector concentration score"
         double gdp_usd "Annual nominal GDP in USD"
         int64 population "Total national population"
@@ -176,9 +184,9 @@ erDiagram
 
     billionaire_individual_2026 {
         int rank PK "Global individual wealth rank"
-        string person_name "Full name of billionaire / family"
-        string gender "Gender (M / F)"
-        float age "Age in years (2026)"
+        string person_name "Full name of billionaire or family"
+        string gender "Gender classification"
+        float age "Age in years"
         string country FK "Primary economic country"
         string iso3 "ISO 3166-1 alpha-3 code"
         string wb_country_name "Standardized World Bank name"
@@ -189,8 +197,8 @@ erDiagram
         string source_of_wealth "Primary company or asset origin"
         string industries "Reported industry sector"
         string primary_industry "Standardized industry category"
-        boolean self_made "Self-made (True) or Inherited (False)"
-        double wealth_gdp_ratio_pct "Individual net worth as % of GDP"
+        boolean self_made "Self-made or Inherited flag"
+        double wealth_gdp_ratio_pct "Individual net worth as percent of GDP"
         double wealth_per_citizen_usd "Per-capita equivalent dividend"
         double wealth_country_share_pct "Share of national billionaire wealth"
         double sector_dominance_score "Sector dominance benchmark"
@@ -211,20 +219,19 @@ Sovereign states are categorized across five distinct wealth-to-GDP tiers, illus
 
 ```mermaid
 flowchart LR
-    %% Modern tier nodes
     classDef extreme fill:#450A0A,stroke:#EF4444,stroke-width:2px,color:#FEE2E2,rx:8,ry:8;
     classDef veryHigh fill:#431407,stroke:#F97316,stroke-width:2px,color:#FFEDD5,rx:8,ry:8;
     classDef high fill:#362B05,stroke:#EAB308,stroke-width:2px,color:#FEF9C3,rx:8,ry:8;
     classDef moderate fill:#064E3B,stroke:#10B981,stroke-width:2px,color:#D1FAE5,rx:8,ry:8;
     classDef low fill:#0C4A6E,stroke:#0EA5E9,stroke-width:2px,color:#E0F2FE,rx:8,ry:8;
 
-    T1["🚨 <b>Extreme Tier</b><br/>≥ 40% of GDP<br/><i>9 Jurisdictions</i><br/>St. Kitts, Cyprus, HK, Israel"]:::extreme
-    T2["🔥 <b>Very High Tier</b><br/>20% to < 40%<br/><i>12 Nations</i><br/>USA, Russia, India, Germany"]:::veryHigh
-    T3["⚡ <b>High Tier</b><br/>10% to < 20%<br/><i>21 Nations</i><br/>China, France, Canada, Brazil"]:::high
-    T4["🌿 <b>Moderate Tier</b><br/>3% to < 10%<br/><i>29 Nations</i><br/>UK, Japan, South Korea, Turkey"]:::moderate
-    T5["💧 <b>Low Tier</b><br/>< 3% of GDP<br/><i>9 Nations</i><br/>Netherlands, Saudi Arabia, Poland"]:::low
+    T1["🚨 Extreme Tier<br/>40% or more of GDP<br/>9 Jurisdictions<br/>St. Kitts, Cyprus, HK, Israel"]:::extreme
+    T2["🔥 Very High Tier<br/>20% to 40% of GDP<br/>12 Nations<br/>USA, Russia, India, Germany"]:::veryHigh
+    T3["⚡ High Tier<br/>10% to 20% of GDP<br/>21 Nations<br/>China, France, Canada, Brazil"]:::high
+    T4["🌿 Moderate Tier<br/>3% to 10% of GDP<br/>29 Nations<br/>UK, Japan, South Korea, Turkey"]:::moderate
+    T5["💧 Low Tier<br/>Under 3% of GDP<br/>9 Nations<br/>Netherlands, Saudi Arabia, Poland"]:::low
 
-    T1 ==> T2 ==> T3 ==> T4 ==> T5
+    T1 --> T2 --> T3 --> T4 --> T5
 ```
 
 ---
@@ -237,10 +244,10 @@ flowchart TD
     classDef inheritedStyle fill:#3B0764,stroke:#C084FC,stroke-width:2px,color:#FAF5FF,rx:8,ry:8;
     classDef rootStyle fill:#0F172A,stroke:#64748B,stroke-width:2px,color:#F8FAFC,rx:8,ry:8;
 
-    R["🌍 3,384 Global Fortunes ($19.64T)"]:::rootStyle
+    R["🌍 3,384 Global Fortunes: $19.64 Trillion"]:::rootStyle
     
-    R --> S["🚀 Self-Made Fortunes<br/><b>66.6%</b> (2,255 Billionaires)<br/><i>Tech Founders, Venture Creators, Modern Industrialists</i>"]:::selfMadeStyle
-    R --> I["🏛️ Inherited Fortunes<br/><b>33.4%</b> (1,129 Billionaires)<br/><i>Multi-Generational Trusts, Legacy Retail & Luxury Dynasties</i>"]:::inheritedStyle
+    R --> S["🚀 Self-Made Fortunes<br/>66.6% Share • 2,255 Billionaires<br/>Tech Founders & Industrialists"]:::selfMadeStyle
+    R --> I["🏛️ Inherited Fortunes<br/>33.4% Share • 1,129 Billionaires<br/>Multi-Generational Wealth Dynasties"]:::inheritedStyle
 
     S --> SC["🇨🇳 China: 97.2% Self-Made<br/>🇷🇺 Russia: 94.0% Self-Made<br/>🇺🇸 USA: 72.2% Self-Made"]:::selfMadeStyle
     I --> IC["🇩🇪 Germany: 73.1% Inherited<br/>🇪🇸 Spain: 75.0% Inherited<br/>🇫🇷 France: 53.7% Inherited"]:::inheritedStyle
