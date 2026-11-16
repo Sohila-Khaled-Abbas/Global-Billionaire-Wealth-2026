@@ -976,18 +976,18 @@ expression tmp_IndustryCoverage =
 expression int_BillionaireIndustryBridge =
 		let
 		    Source = stg_BillionaireIndividual,
-		    #"Choose columns" = Table.SelectColumns(Source, {"industries", "forbes_uri"}),
+		    #"Choose columns" = Table.SelectColumns(Source, {"forbes_uri", "industries"}),
 		    #"Invoked custom function" = Table.AddColumn(
 		        #"Choose columns",
-		        "Invoked custom function",
+		        "industry",
 		        each fn_ParseIndustries([industries]),
 		        type list
 		    ),
-		  #"Expanded Invoked custom function" = Table.ExpandListColumn(#"Invoked custom function", "Invoked custom function"),
-		  #"Renamed columns" = Table.RenameColumns(#"Expanded Invoked custom function", {{"Invoked custom function", "industry"}}),
-		  #"Removed columns" = Table.RemoveColumns(#"Renamed columns", {"industries"}),
-		  #"Changed column type" = Table.TransformColumnTypes(#"Removed columns", {{"industry", type text}}),
-		  #"Removed duplicates" = Table.Distinct(#"Changed column type", {"forbes_uri"})
+		    #"Removed columns" = Table.RemoveColumns(#"Invoked custom function", {"industries"}),
+		    #"Expanded industry" = Table.ExpandListColumn(#"Removed columns", "industry"),
+		    #"Changed column type" = Table.TransformColumnTypes(#"Expanded industry", {{"industry", type text}}),
+		    #"Filtered non-null" = Table.SelectRows(#"Changed column type", each [industry] <> null and [industry] <> ""),
+		    #"Removed duplicates" = Table.Distinct(#"Filtered non-null", {"forbes_uri", "industry"})
 		in
 		    #"Removed duplicates"
 	lineageTag: d56611db-4b11-4925-97c2-6e154b04dda7
@@ -2297,7 +2297,7 @@ expression tmp_CountryMetricReconciliation =
 		            type number
 		        ),
 		
-		    // 4. Select audit fields
+		// 4. Select audit fields
 		    Output =
 		        Table.SelectColumns(
 		            AddGDPDifference,
@@ -2305,6 +2305,7 @@ expression tmp_CountryMetricReconciliation =
 		                "country",
 		                "iso3",
 		                "billionaire_count",
+		                "total_wealth_usd_m",
 		
 		                "mean_wealth_usd_m",
 		                "Calculated_Mean_Wealth_USD_M",
