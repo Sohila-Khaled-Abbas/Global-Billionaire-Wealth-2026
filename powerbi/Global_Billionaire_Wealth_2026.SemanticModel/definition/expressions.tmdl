@@ -206,3 +206,48 @@ expression tmp_SourceValidation =
 	lineageTag: 37c9dd57-57da-47e4-af0e-27f468485d3a
 	queryGroup: 99_Archive
 
+expression qa_IndividualByCountry =
+		let
+		  Source = stg_BillionaireIndividual,
+		  #"Choose columns" = Table.SelectColumns(Source, {"iso3", "net_worth_usd"}),
+		  #"Grouped rows" = Table.Group(#"Choose columns", {"iso3"}, {{"Individual_Billionaire_Count", each Table.RowCount(_), Int64.Type}, {"Individual_Total_Wealth_USD", each List.Sum([net_worth_usd]), type nullable number}})
+		in
+		  #"Grouped rows"
+	lineageTag: 6a1c777e-f4b0-467a-b480-7e45e2c573a8
+	queryGroup: '05_QA & Reconciliation'
+
+	annotation PBI_ResultType = Table
+
+expression qa_CountryAggregate =
+		let
+		  Source = stg_BillionaireCountry,
+		  #"Choose columns" = Table.SelectColumns(Source, {"country", "iso3", "billionaire_count", "total_wealth_usd"}),
+		  #"Renamed columns" = Table.RenameColumns(#"Choose columns", {{"billionaire_count", "Aggregate_Billionaire_Count"}, {"total_wealth_usd", "Aggregate_Total_Wealth_USD"}})
+		in
+		  #"Renamed columns"
+	lineageTag: 2575957a-87cf-4319-bc76-2a954a26e115
+	queryGroup: '05_QA & Reconciliation'
+
+	annotation PBI_ResultType = Table
+
+expression qa_CountryReconciliation =
+		let
+		  Source = Table.NestedJoin(qa_IndividualByCountry, {"iso3"}, qa_CountryAggregate, {"iso3"}, "qa_CountryAggregate", JoinKind.FullOuter),
+		  #"Expanded qa_CountryAggregate" = Table.ExpandTableColumn(Source, "qa_CountryAggregate", {"country", "iso3", "Aggregate_Billionaire_Count", "Aggregate_Total_Wealth_USD"}, {"country", "Aggregate_ISO3", "Aggregate_Billionaire_Count", "Aggregate_Total_Wealth_USD"}),
+		  #"Added custom" = Table.TransformColumnTypes(Table.AddColumn(#"Expanded qa_CountryAggregate", "Count_Difference", each [Individual_Billionaire_Count] - [Aggregate_Billionaire_Count]), {{"Count_Difference", Int64.Type}}),
+		  #"Added custom 1" = Table.TransformColumnTypes(Table.AddColumn(#"Added custom", "Wealth_Difference", each [Individual_Total_Wealth_USD] - [Aggregate_Total_Wealth_USD]), {{"Wealth_Difference", Int64.Type}}),
+		  #"Added custom 2" = Table.TransformColumnTypes(Table.AddColumn(#"Added custom 1", "Reconciliation_Status", each if [Individual_Billionaire_Count] = null then
+		    "Missing from individual data"
+		else if [Aggregate_Billionaire_Count] = null then
+		    "Missing from country aggregate"
+		else if [Count_Difference] <> 0 then
+		    "Count mismatch"
+		else if Number.Round([Wealth_Difference], 2) <> 0 then
+		    "Wealth mismatch"
+		else
+		    "Matched"), {{"Reconciliation_Status", type text}})
+		in
+		  #"Added custom 2"
+	lineageTag: d32e7f72-5fed-4135-aead-000444168561
+	queryGroup: '05_QA & Reconciliation'
+
