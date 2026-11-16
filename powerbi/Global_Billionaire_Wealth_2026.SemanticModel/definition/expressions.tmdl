@@ -2531,3 +2531,119 @@ expression tmp_CountryPrecisionAudit =
 
 	annotation PBI_ResultType = Table
 
+expression tmp_MeanWealthRoundingExceptions =
+		let
+		    Source =
+		        tmp_CountryMetricReconciliation,
+		
+		    // Identify the three mismatched countries
+		    Exceptions =
+		        Table.SelectRows(
+		            Source,
+		            each
+		                Number.Round(
+		                    [mean_wealth_usd_m],
+		                    2
+		                )
+		                <>
+		                Number.Round(
+		                    [Calculated_Mean_Wealth_USD_M],
+		                    2
+		                )
+		        ),
+		
+		    // Show precise source and calculated values
+		    AddSourcePrecision =
+		        Table.AddColumn(
+		            Exceptions,
+		            "Source_Mean_Precise",
+		            each Number.ToText(
+		                [mean_wealth_usd_m],
+		                "0.000000000000",
+		                "en-US"
+		            ),
+		            type text
+		        ),
+		
+		    AddCalculatedPrecision =
+		        Table.AddColumn(
+		            AddSourcePrecision,
+		            "Calculated_Mean_Precise",
+		            each Number.ToText(
+		                [Calculated_Mean_Wealth_USD_M],
+		                "0.000000000000",
+		                "en-US"
+		            ),
+		            type text
+		        ),
+		
+		    // Compare the rounding methods
+		    AddSourceRounded =
+		        Table.AddColumn(
+		            AddCalculatedPrecision,
+		            "Source_Rounded_2",
+		            each Number.Round(
+		                [mean_wealth_usd_m],
+		                2
+		            ),
+		            type number
+		        ),
+		
+		    AddCalculatedRounded =
+		        Table.AddColumn(
+		            AddSourceRounded,
+		            "Calculated_Rounded_2",
+		            each Number.Round(
+		                [Calculated_Mean_Wealth_USD_M],
+		                2
+		            ),
+		            type number
+		        ),
+		
+		    // Test midpoint rounding away from zero
+		    AddAwayFromZero =
+		        Table.AddColumn(
+		            AddCalculatedRounded,
+		            "Calculated_AwayFromZero",
+		            each Number.Round(
+		                [Calculated_Mean_Wealth_USD_M],
+		                2,
+		                RoundingMode.AwayFromZero
+		            ),
+		            type number
+		        ),
+		
+		    // Actual numerical difference
+		    AddExactDifference =
+		        Table.AddColumn(
+		            AddAwayFromZero,
+		            "Exact_Difference",
+		            each
+		                [mean_wealth_usd_m]
+		                - [Calculated_Mean_Wealth_USD_M],
+		            type number
+		        ),
+		
+		    Output =
+		        Table.SelectColumns(
+		            AddExactDifference,
+		            {
+		                "country",
+		                "iso3",
+		                "billionaire_count",
+		                "total_wealth_usd_m",
+		                "Source_Mean_Precise",
+		                "Calculated_Mean_Precise",
+		                "Source_Rounded_2",
+		                "Calculated_Rounded_2",
+		                "Calculated_AwayFromZero",
+		                "Exact_Difference"
+		            }
+		        )
+		in
+		    Output
+	lineageTag: 97acf402-d0a4-4ec3-ae12-2fc4c3a14ee3
+	queryGroup: 99_Archive
+
+	annotation PBI_ResultType = Exception
+
