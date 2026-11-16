@@ -1246,3 +1246,16 @@ expression int_IndustryLookup =
 
 	annotation PBI_ResultType = Table
 
+expression tmp_IndustryDistribution =
+		let
+		  Source = stg_BillionaireIndividual,
+		  #"Choose columns" = Table.SelectColumns(Source, {"primary_industry"}),
+		  #"Grouped rows" = Table.Group(#"Choose columns", {"primary_industry"}, {{"Billionaire_Count", each Table.RowCount(_), Int64.Type}}),
+		  #"Sorted rows" = Table.Sort(#"Grouped rows", {{"Billionaire_Count", Order.Descending}})
+		in
+		  #"Sorted rows"
+	lineageTag: 6e3e06c0-8ada-45d9-87d7-e55246ba1458
+	queryGroup: 99_Archive
+
+	annotation PBI_ResultType = Table
+
