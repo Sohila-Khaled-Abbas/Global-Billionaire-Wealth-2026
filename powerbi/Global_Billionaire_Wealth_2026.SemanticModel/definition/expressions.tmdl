@@ -804,3 +804,93 @@ expression tmp_KeyAudit =
 	lineageTag: 3b3911b1-e9fd-4b7d-a898-3bdadda92f2f
 	queryGroup: 99_Archive
 
+expression fn_ParseIndustries =
+		(Industries as nullable text) as list =>
+		
+		if Industries = null then
+		    {}
+		else
+		    let
+		        // Split the original field on pipe delimiters
+		        Tokens =
+		            Text.Split(Industries, "|"),
+		
+		        // Standardize each individual industry label
+		        CleanedTokens =
+		            List.Transform(
+		                Tokens,
+		                (Token) =>
+		                    let
+		                        ReplaceNBSP =
+		                            Text.Replace(
+		                                Token,
+		                                Character.FromNumber(160),
+		                                " "
+		                            ),
+		
+		                        CleanText =
+		                            Text.Clean(ReplaceNBSP),
+		
+		                        TrimText =
+		                            Text.Trim(CleanText),
+		
+		                        Words =
+		                            List.Select(
+		                                Text.Split(TrimText, " "),
+		                                each _ <> ""
+		                            ),
+		
+		                        Standardized =
+		                            Text.Combine(Words, " ")
+		                    in
+		                        Standardized
+		            ),
+		
+		        // Remove blank industry labels
+		        NonEmptyTokens =
+		            List.Select(
+		                CleanedTokens,
+		                each _ <> ""
+		            ),
+		
+		        // Remove repeated labels for the same record
+		        DistinctTokens =
+		            List.Distinct(NonEmptyTokens)
+		
+		    in
+		        DistinctTokens
+	lineageTag: 27710be0-3937-4132-b389-80097863216a
+	queryGroup: '00_Parameters & Functions'
+
+	annotation PBI_ResultType = Function
+
+expression tmp_IndustryFunctionTest =
+		let
+		    TestData =
+		        #table(
+		            type table [
+		                Original = nullable text
+		            ],
+		            {
+		                {"Technology | Retail | Technology"},
+		                {" Automotive | Finance "},
+		                {null},
+		                {"| |"},
+		                {"Healthcare| Healthcare "}
+		            }
+		        ),
+		
+		    TestResult =
+		        Table.AddColumn(
+		            TestData,
+		            "ParsedIndustries",
+		            each fn_ParseIndustries([Original]),
+		            type list
+		        )
+		in
+		    TestResult
+	lineageTag: 24c06a92-4d79-4140-8386-315851d3ceda
+	queryGroup: 99_Archive
+
+	annotation PBI_ResultType = Table
+
