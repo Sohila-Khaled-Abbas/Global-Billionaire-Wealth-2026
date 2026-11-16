@@ -2,91 +2,42 @@ name: CI & Data Integrity Verification
 
 on:
   push:
-    branches: [main, master, develop]
+    branches: ["**"]
   pull_request:
-    branches: [main, master]
+    branches: ["**"]
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
-  validate-data:
-    name: Validate Datasets & Schema Integrity
+  audit-data-and-model:
+    name: Validate Data Integrity & Semantic Model
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout Repository
+      - name: 📥 Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Set up Python
+      - name: 🐍 Set up Python 3.11
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
           cache: "pip"
+          cache-dependency-path: "requirements-dev.txt"
 
-      - name: Install Dependencies
+      - name: 📦 Install Dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install pandas
+          pip install -r requirements-dev.txt
 
-      - name: Run Data Integrity & Referential Consistency Audit
+      - name: 🧪 Execute Data & Semantic Model Audit
+        run: python scripts/validate_data.py
+
+      - name: 📊 Confirm PBIP & TMDL Integrity
         run: |
-          python - << 'EOF'
-          import sys
-          import pandas as pd
-
-          print("=== STEP 1: Load Data Files ===")
-          try:
-              df_ind = pd.read_csv("data/raw/billionaire_individual_2026.csv")
-              df_agg = pd.read_csv("data/raw/billionaire_country_aggregate_2026.csv")
-              print(f"Loaded Individual records: {len(df_ind)}")
-              print(f"Loaded Country Aggregate records: {len(df_agg)}")
-          except Exception as e:
-              print(f"Error loading CSV files: {e}")
-              sys.exit(1)
-
-          print("\n=== STEP 2: Schema Column Verification ===")
-          req_ind_cols = [
-              "rank", "person_name", "gender", "age", "country", "iso3", 
-              "net_worth_usd_m", "primary_industry", "self_made"
-          ]
-          req_agg_cols = [
-              "country_wealth_rank", "country", "iso3", "billionaire_count", 
-              "total_wealth_usd_m", "country_wealth_gdp_pct"
-          ]
-
-          for c in req_ind_cols:
-              assert c in df_ind.columns, f"Missing required column in individual table: {c}"
-          for c in req_agg_cols:
-              assert c in df_agg.columns, f"Missing required column in aggregate table: {c}"
-          print("All critical schema columns verified.")
-
-          print("\n=== STEP 3: Referential Integrity Check ===")
-          ind_countries = set(df_ind["country"].unique())
-          agg_countries = set(df_agg["country"].unique())
-          orphaned = ind_countries - agg_countries
-          assert len(orphaned) == 0, f"Found orphaned countries in individual dataset: {orphaned}"
-          print(f"Referential integrity verified: {len(agg_countries)} countries mapped cleanly.")
-
-          print("\n=== STEP 4: Balance-Sheet Reconciliation ===")
-          ind_sum = df_ind["net_worth_usd_m"].sum()
-          agg_sum = df_agg["total_wealth_usd_m"].sum()
-          diff = abs(ind_sum - agg_sum)
-          assert diff < 1.0, f"Wealth sum mismatch! Ind: {ind_sum}, Agg: {agg_sum}, Diff: {diff}"
-          print(f"Reconciliation verified: Ind Wealth Sum = {ind_sum:,.2f} M, Agg Wealth Sum = {agg_sum:,.2f} M")
-
-          print("\nAll data integrity tests passed successfully.")
-          EOF
-
-  validate-pbip:
-    name: Validate PBIP & TMDL Architecture
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
-
-      - name: Verify Power BI Developer Files Exist
-        run: |
-          test -f powerbi/Global_Billionaire_Wealth_2026.pbip || { echo "Missing PBIP file"; exit 1; }
-          test -f powerbi/Global_Billionaire_Wealth_2026.Report/definition.pbir || { echo "Missing PBIR file"; exit 1; }
-          test -f powerbi/Global_Billionaire_Wealth_2026.SemanticModel/definition.pbism || { echo "Missing PBISM file"; exit 1; }
-          test -f powerbi/Global_Billionaire_Wealth_2026.SemanticModel/definition/model.tmdl || { echo "Missing model.tmdl"; exit 1; }
-          test -f powerbi/Global_Billionaire_Wealth_2026.SemanticModel/definition/relationships.tmdl || { echo "Missing relationships.tmdl"; exit 1; }
-          echo "All PBIP, TMDL, and report definition structures verified."
+          test -f powerbi/Global_Billionaire_Wealth_2026.pbip
+          test -f powerbi/Global_Billionaire_Wealth_2026.Report/definition.pbir
+          test -f powerbi/Global_Billionaire_Wealth_2026.SemanticModel/definition.pbism
+          test -f powerbi/Global_Billionaire_Wealth_2026.SemanticModel/definition/model.tmdl
+          test -f powerbi/Global_Billionaire_Wealth_2026.SemanticModel/definition/relationships.tmdl
+          echo "Power BI Developer Mode files verified."

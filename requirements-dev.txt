@@ -1,0 +1,2 @@
+# Core Data Validation Dependencies
+pandas>=2.0.0
