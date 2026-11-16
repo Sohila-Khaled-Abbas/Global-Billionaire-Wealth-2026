@@ -146,3 +146,63 @@ expression src_BillionaireCountry =
 	lineageTag: 5ea73786-18af-4b15-9ea3-efda500cbfc1
 	queryGroup: 01_Source
 
+expression tmp_SourceValidation =
+		let
+		    Validation =
+		        #table(
+		            type table [
+		                Source = text,
+		                Expected_Rows = Int64.Type,
+		                Actual_Rows = Int64.Type,
+		                Expected_Columns = Int64.Type,
+		                Actual_Columns = Int64.Type,
+		                Status = text
+		            ],
+		            {
+		                {
+		                    "Individual",
+		                    3384,
+		                    Table.RowCount(src_BillionaireIndividual),
+		                    25,
+		                    List.Count(
+		                        Table.ColumnNames(
+		                            src_BillionaireIndividual
+		                        )
+		                    ),
+		                    if
+		                        Table.RowCount(src_BillionaireIndividual) = 3384
+		                        and List.Count(
+		                            Table.ColumnNames(
+		                                src_BillionaireIndividual
+		                            )
+		                        ) = 25
+		                    then "Passed"
+		                    else "Investigate"
+		                },
+		                {
+		                    "Country",
+		                    80,
+		                    Table.RowCount(src_BillionaireCountry),
+		                    23,
+		                    List.Count(
+		                        Table.ColumnNames(
+		                            src_BillionaireCountry
+		                        )
+		                    ),
+		                    if
+		                        Table.RowCount(src_BillionaireCountry) = 80
+		                        and List.Count(
+		                            Table.ColumnNames(
+		                                src_BillionaireCountry
+		                            )
+		                        ) = 23
+		                    then "Passed"
+		                    else "Investigate"
+		                }
+		            }
+		        )
+		in
+		    Validation
+	lineageTag: 37c9dd57-57da-47e4-af0e-27f468485d3a
+	queryGroup: 99_Archive
+
