@@ -2406,3 +2406,128 @@ expression tmp_CountryMetricReconciliationSummary =
 
 	annotation PBI_ResultType = Table
 
+expression tmp_CountryPrecisionAudit =
+		let
+		    Source =
+		        tmp_CountryMetricReconciliation,
+		
+		    // Define the expected display precision
+		    Tests =
+		        #table(
+		            type table [
+		                Metric = text,
+		                SourceColumn = text,
+		                CalculatedColumn = text,
+		                DifferenceColumn = text,
+		                DecimalPlaces = Int64.Type
+		            ],
+		            {
+		                {
+		                    "Mean wealth",
+		                    "mean_wealth_usd_m",
+		                    "Calculated_Mean_Wealth_USD_M",
+		                    "Mean_Wealth_Difference",
+		                    2
+		                },
+		                {
+		                    "Self-made ratio",
+		                    "self_made_ratio_pct",
+		                    "Calculated_SelfMade_Ratio_Pct",
+		                    "SelfMade_Ratio_Difference",
+		                    1
+		                },
+		                {
+		                    "Billionaire density",
+		                    "billionaires_per_million_pop",
+		                    "Calculated_Billionaires_Per_Million",
+		                    "Density_Difference",
+		                    4
+		                },
+		                {
+		                    "Wealth-to-GDP",
+		                    "country_wealth_gdp_pct",
+		                    "Calculated_Wealth_GDP_Pct",
+		                    "Wealth_GDP_Difference",
+		                    4
+		                },
+		                {
+		                    "GDP per billionaire",
+		                    "gdp_per_billionaire_bn",
+		                    "Calculated_GDP_Per_Billionaire_Bn",
+		                    "GDP_Per_Billionaire_Difference",
+		                    2
+		                }
+		            }
+		        ),
+		
+		    AddMismatchCount =
+		        Table.AddColumn(
+		            Tests,
+		            "Mismatches_After_Rounding",
+		            (Test) =>
+		                let
+		                    SourceColumn =
+		                        Test[SourceColumn],
+		
+		                    CalculatedColumn =
+		                        Test[CalculatedColumn],
+		
+		                    Digits =
+		                        Test[DecimalPlaces],
+		
+		                    Mismatches =
+		                        Table.SelectRows(
+		                            Source,
+		                            (CurrentRow) =>
+		                                Number.Round(
+		                                    Record.Field(
+		                                        CurrentRow,
+		                                        SourceColumn
+		                                    ),
+		                                    Digits
+		                                )
+		                                <>
+		                                Number.Round(
+		                                    Record.Field(
+		                                        CurrentRow,
+		                                        CalculatedColumn
+		                                    ),
+		                                    Digits
+		                                )
+		                        )
+		                in
+		                    Table.RowCount(Mismatches),
+		            Int64.Type
+		        ),
+		
+		    AddMaximumDifference =
+		        Table.AddColumn(
+		            AddMismatchCount,
+		            "Maximum_Absolute_Difference",
+		            each
+		                List.Max(
+		                    Table.Column(
+		                        Source,
+		                        [DifferenceColumn]
+		                    )
+		                ),
+		            type number
+		        ),
+		
+		    Result =
+		        Table.SelectColumns(
+		            AddMaximumDifference,
+		            {
+		                "Metric",
+		                "DecimalPlaces",
+		                "Mismatches_After_Rounding",
+		                "Maximum_Absolute_Difference"
+		            }
+		        )
+		in
+		    Result
+	lineageTag: 3037deaa-a6e1-4b5c-977c-2a97470ae0e8
+	queryGroup: 99_Archive
+
+	annotation PBI_ResultType = Table
+
