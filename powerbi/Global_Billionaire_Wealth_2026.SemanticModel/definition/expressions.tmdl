@@ -995,3 +995,172 @@ expression int_BillionaireIndustryBridge =
 
 	annotation PBI_ResultType = Table
 
+expression tmp_IndustryDelimiterAudit =
+		let
+		    // 1. Read the original staging table
+		    Source =
+		        stg_BillionaireIndividual,
+		
+		    // 2. Parse the actual industries column
+		    AddedIndustryList =
+		        Table.AddColumn(
+		            Source,
+		            "_IndustryList",
+		            each fn_ParseIndustries([industries]),
+		            type list
+		        ),
+		
+		    // 3. Count memberships per individual
+		    AddedIndustryCount =
+		        Table.AddColumn(
+		            AddedIndustryList,
+		            "_IndustryCount",
+		            each List.Count([_IndustryList]),
+		            Int64.Type
+		        ),
+		
+		    IndustryCounts =
+		        Table.Column(
+		            AddedIndustryCount,
+		            "_IndustryCount"
+		        ),
+		
+		    // 4. Inspect the original, unparsed values
+		    RawIndustryValues =
+		        List.RemoveNulls(
+		            Table.Column(Source, "industries")
+		        ),
+		
+		    NonBlankIndustryValues =
+		        List.Select(
+		            RawIndustryValues,
+		            each Text.Trim(_) <> ""
+		        ),
+		
+		    RowsContainingPipe =
+		        List.Count(
+		            List.Select(
+		                NonBlankIndustryValues,
+		                each Text.Contains(_, "|")
+		            )
+		        ),
+		
+		    // 5. Calculate membership statistics
+		    MultipleIndustryIndividuals =
+		        Table.RowCount(
+		            Table.SelectRows(
+		                AddedIndustryCount,
+		                each [_IndustryCount] > 1
+		            )
+		        ),
+		
+		    SingleIndustryIndividuals =
+		        Table.RowCount(
+		            Table.SelectRows(
+		                AddedIndustryCount,
+		                each [_IndustryCount] = 1
+		            )
+		        ),
+		
+		    UnmappedIndividuals =
+		        Table.RowCount(
+		            Table.SelectRows(
+		                AddedIndustryCount,
+		                each [_IndustryCount] = 0
+		            )
+		        ),
+		
+		    TotalMemberships =
+		        List.Sum(IndustryCounts),
+		
+		    AllIndustryLabels =
+		        List.Combine(
+		            AddedIndustryCount[_IndustryList]
+		        ),
+		
+		    DistinctIndustryLabels =
+		        List.Distinct(AllIndustryLabels),
+		
+		    MaximumMemberships =
+		        if List.IsEmpty(IndustryCounts) then
+		            0
+		        else
+		            List.Max(IndustryCounts),
+		
+		    // 6. Compare primary industry to the full list
+		    PrimaryIndustryCheck =
+		        Table.AddColumn(
+		            AddedIndustryCount,
+		            "_PrimaryMatch",
+		            each
+		                let
+		                    RawPrimary = [primary_industry],
+		
+		                    CleanPrimary =
+		                        if RawPrimary = null then
+		                            null
+		                        else
+		                            Text.Combine(
+		                                List.Select(
+		                                    Text.Split(
+		                                        Text.Trim(
+		                                            Text.Clean(
+		                                                Text.Replace(
+		                                                    RawPrimary,
+		                                                    Character.FromNumber(160),
+		                                                    " "
+		                                                )
+		                                            )
+		                                        ),
+		                                        " "
+		                                    ),
+		                                    each _ <> ""
+		                                ),
+		                                " "
+		                            )
+		                in
+		                    if CleanPrimary = null or CleanPrimary = "" then
+		                        null
+		                    else
+		                        List.Contains(
+		                            [_IndustryList],
+		                            CleanPrimary
+		                        ),
+		            type nullable logical
+		        ),
+		
+		    PrimaryMismatchCount =
+		        Table.RowCount(
+		            Table.SelectRows(
+		                PrimaryIndustryCheck,
+		                each [_PrimaryMatch] = false
+		            )
+		        ),
+		
+		    // 7. Produce audit results
+		    Result =
+		        #table(
+		            type table [
+		                Metric = text,
+		                Value = number
+		            ],
+		            {
+		                {"Total individuals", Table.RowCount(Source)},
+		                {"Nonblank raw industry values", List.Count(NonBlankIndustryValues)},
+		                {"Raw values containing pipe", RowsContainingPipe},
+		                {"Individuals with multiple industries", MultipleIndustryIndividuals},
+		                {"Individuals with exactly one industry", SingleIndustryIndividuals},
+		                {"Individuals without industry", UnmappedIndividuals},
+		                {"Total distinct person-industry memberships", TotalMemberships},
+		                {"Maximum industries per individual", MaximumMemberships},
+		                {"Distinct industry labels", List.Count(DistinctIndustryLabels)},
+		                {"Primary industry not found in full list", PrimaryMismatchCount}
+		            }
+		        )
+		in
+		    Result
+	lineageTag: 28aaabff-16f8-4391-9dd6-d039295415c6
+	queryGroup: 99_Archive
+
+	annotation PBI_ResultType = Table
+
