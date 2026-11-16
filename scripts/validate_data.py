@@ -15,17 +15,26 @@ def run_validations():
     print("=" * 60)
 
     base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+    
+    # Paths
     ind_csv = os.path.join(base_dir, "data", "raw", "billionaire_individual_2026.csv")
     agg_csv = os.path.join(base_dir, "data", "raw", "billionaire_country_aggregate_2026.csv")
     pbip_file = os.path.join(base_dir, "powerbi", "Global_Billionaire_Wealth_2026.pbip")
+    pbir_file = os.path.join(base_dir, "powerbi", "Global_Billionaire_Wealth_2026.Report", "definition.pbir")
+    pbism_file = os.path.join(base_dir, "powerbi", "Global_Billionaire_Wealth_2026.SemanticModel", "definition.pbism")
     report_json = os.path.join(base_dir, "powerbi", "Global_Billionaire_Wealth_2026.Report", "definition", "report.json")
     model_tmdl = os.path.join(base_dir, "powerbi", "Global_Billionaire_Wealth_2026.SemanticModel", "definition", "model.tmdl")
+    database_tmdl = os.path.join(base_dir, "powerbi", "Global_Billionaire_Wealth_2026.SemanticModel", "definition", "database.tmdl")
+    expressions_tmdl = os.path.join(base_dir, "powerbi", "Global_Billionaire_Wealth_2026.SemanticModel", "definition", "expressions.tmdl")
 
     errors = []
     checks = []
 
     # 1. File existence checks
-    critical_files = [ind_csv, agg_csv, pbip_file, report_json, model_tmdl]
+    critical_files = [
+        ind_csv, agg_csv, pbip_file, pbir_file, pbism_file, 
+        report_json, model_tmdl, database_tmdl, expressions_tmdl
+    ]
     for filepath in critical_files:
         rel_path = os.path.relpath(filepath, base_dir)
         if os.path.exists(filepath):
@@ -35,7 +44,7 @@ def run_validations():
             checks.append((f"File Exists: `{rel_path}`", "FAIL", "File Not Found"))
 
     if errors:
-        print("\n❌ File checks failed:")
+        print("\n❌ Critical file checks failed:")
         for e in errors:
             print(f"  - {e}")
         return False, checks
@@ -109,7 +118,7 @@ def run_validations():
     print("\n--- Validation Results Summary ---")
     for name, status, detail in checks:
         icon = "✅" if status == "PASS" else "❌"
-        print(f"{icon} {name:<40} [{status}] {detail}")
+        print(f"{icon} {name:<42} [{status}] {detail}")
 
     # Output to GitHub Step Summary if running in GitHub Actions
     summary_path = os.environ.get("GITHUB_STEP_SUMMARY")

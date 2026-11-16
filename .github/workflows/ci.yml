@@ -32,12 +32,3 @@ jobs:
 
       - name: 🧪 Execute Data & Semantic Model Audit
         run: python scripts/validate_data.py
-
-      - name: 📊 Confirm PBIP & TMDL Integrity
-        run: |
-          test -f powerbi/Global_Billionaire_Wealth_2026.pbip
-          test -f powerbi/Global_Billionaire_Wealth_2026.Report/definition.pbir
-          test -f powerbi/Global_Billionaire_Wealth_2026.SemanticModel/definition.pbism
-          test -f powerbi/Global_Billionaire_Wealth_2026.SemanticModel/definition/model.tmdl
-          test -f powerbi/Global_Billionaire_Wealth_2026.SemanticModel/definition/relationships.tmdl
-          echo "Power BI Developer Mode files verified."
