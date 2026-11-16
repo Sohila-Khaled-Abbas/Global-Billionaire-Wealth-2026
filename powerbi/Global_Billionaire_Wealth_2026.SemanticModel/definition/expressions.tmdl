@@ -80,3 +80,69 @@ expression fn_StandardizeCountry =
 
 	annotation PBI_ResultType = Function
 
+expression src_BillionaireIndividual =
+		let
+		    // 1. Read the original CSV file
+		    SourceBinary =
+		        File.Contents(
+		            p_DataFolderPath &
+		            "\billionaire_individual_2026.csv"
+		        ),
+		
+		    // 2. Parse CSV structure
+		    CsvData =
+		        Csv.Document(
+		            SourceBinary,
+		            [
+		                Delimiter = ",",
+		                Encoding = 65001,
+		                QuoteStyle = QuoteStyle.Csv
+		            ]
+		        ),
+		
+		    // 3. Promote the first row to headers
+		    PromotedHeaders =
+		        Table.PromoteHeaders(
+		            CsvData,
+		            [PromoteAllScalars = true]
+		        )
+		
+		in
+		    PromotedHeaders
+	lineageTag: c959f6de-8467-415d-85e3-6e62c997169c
+	queryGroup: 01_Source
+
+	annotation PBI_ResultType = Table
+
+expression src_BillionaireCountry =
+		let
+		    // 1. Read the original CSV file
+		    SourceBinary =
+		        File.Contents(
+		            p_DataFolderPath &
+		            "\billionaire_country_aggregate_2026.csv"
+		        ),
+		
+		    // 2. Parse CSV structure
+		    CsvData =
+		        Csv.Document(
+		            SourceBinary,
+		            [
+		                Delimiter = ",",
+		                Encoding = 65001,
+		                QuoteStyle = QuoteStyle.Csv
+		            ]
+		        ),
+		
+		    // 3. Promote headers
+		    PromotedHeaders =
+		        Table.PromoteHeaders(
+		            CsvData,
+		            [PromoteAllScalars = true]
+		        )
+		
+		in
+		    PromotedHeaders
+	lineageTag: 5ea73786-18af-4b15-9ea3-efda500cbfc1
+	queryGroup: 01_Source
+

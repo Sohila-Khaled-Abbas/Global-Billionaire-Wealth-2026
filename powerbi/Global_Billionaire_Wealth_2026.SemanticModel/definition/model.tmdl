@@ -45,7 +45,7 @@ queryGroup 99_Archive
 
 annotation __PBI_TimeIntelligenceEnabled = 0
 
-annotation PBI_QueryOrder = ["stg_BillionaireIndividual","stg_BillionaireCountry","p_DataFolderPath","p_SnapshotDate","fn_StandardizeCountry"]
+annotation PBI_QueryOrder = ["src_BillionaireIndividual","src_BillionaireCountry","stg_BillionaireIndividual","stg_BillionaireCountry","p_DataFolderPath","p_SnapshotDate","fn_StandardizeCountry"]
 
 annotation PBI_ProTooling = ["DevMode"]
 
