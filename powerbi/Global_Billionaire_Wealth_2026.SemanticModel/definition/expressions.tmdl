@@ -75,10 +75,57 @@ expression stg_BillionaireIndividual =
 		                    type nullable text
 		                }
 		            }
+		        ),
+		
+		
+		    // ==================================================
+		    // 4. PARSE UTC SNAPSHOT TIMESTAMP
+		    // Preserve UTC explicitly as timezone offset +00:00
+		    // ==================================================
+		    TimestampAsUtc =
+		        Table.TransformColumns(
+		            StandardizedCountry,
+		            {
+		                {
+		                    "scrape_timestamp",
+		                    each
+		                        if _ = null then
+		                            null
+		                        else
+		                            let
+		                                TimestampText = Text.Trim(_),
+		
+		                                TimestampWithoutUtc =
+		                                    if Text.EndsWith(
+		                                        TimestampText,
+		                                        " UTC",
+		                                        Comparer.OrdinalIgnoreCase
+		                                    )
+		                                    then
+		                                        Text.Start(
+		                                            TimestampText,
+		                                            Text.Length(TimestampText) - 4
+		                                        )
+		                                    else
+		                                        TimestampText,
+		
+		                                ParsedDateTime =
+		                                    DateTime.FromText(
+		                                        TimestampWithoutUtc,
+		                                        [Culture = "en-US"]
+		                                    )
+		                            in
+		                                DateTime.AddZone(
+		                                    ParsedDateTime,
+		                                    0
+		                                ),
+		                    type nullable datetimezone
+		                }
+		            }
 		        )
 		
 		in
-		    StandardizedCountry
+		    TimestampAsUtc
 	lineageTag: ad148b8f-1bd9-4df2-8883-b843aafbba2c
 	queryGroup: 02_Staging
 
@@ -86,11 +133,81 @@ expression stg_BillionaireIndividual =
 
 expression stg_BillionaireCountry =
 		let
-		  Source = Csv.Document(File.Contents("D:\courses\Data Analysis 26-27\Projects\Global-Billionaire-Wealth-2026\data\raw\billionaire_country_aggregate_2026.csv"), [Delimiter = ",", Columns = 23, Encoding = 65001, QuoteStyle = QuoteStyle.None]),
-		  #"Promoted headers" = Table.PromoteHeaders(Source, [PromoteAllScalars = true]),
-		  #"Changed column type" = Table.TransformColumnTypes(#"Promoted headers", {{"country_wealth_rank", Int64.Type}, {"country", type text}, {"iso3", type text}, {"wb_country_name", type text}, {"billionaire_count", Int64.Type}, {"total_wealth_usd_m", type number}, {"total_wealth_usd", Int64.Type}, {"mean_wealth_usd_m", type number}, {"median_wealth_usd_m", type number}, {"max_wealth_usd_m", type number}, {"top_billionaire", type text}, {"dominant_industry_by_wealth", type text}, {"self_made_count", Int64.Type}, {"self_made_ratio_pct", type number}, {"mean_age", type number}, {"country_wealth_gdp_pct", type number}, {"billionaires_per_million_pop", type number}, {"wealth_concentration_tier", type text}, {"gdp_per_billionaire_bn", type number}, {"sector_dominance_score", type number}, {"gdp_usd", type number}, {"population", Int64.Type}, {"gdp_year", Int64.Type}}, "en-US")
+		    // ==================================================
+		    // 1. SOURCE
+		    // Reference the validated country source query
+		    // ==================================================
+		
+		    Source =
+		        src_BillionaireCountry,
+		
+		    // ==================================================
+		    // 2. EXPLICIT DATA TYPES
+		    // ==================================================
+		
+		    ChangedTypes =
+		        Table.TransformColumnTypes(
+		            Source,
+		            {
+		                {"country_wealth_rank", Int64.Type},
+		                {"country", type text},
+		                {"iso3", type text},
+		                {"wb_country_name", type text},
+		                {"billionaire_count", Int64.Type},
+		                {"total_wealth_usd_m", type number},
+		                {"total_wealth_usd", type number},
+		                {"mean_wealth_usd_m", type number},
+		                {"median_wealth_usd_m", type number},
+		                {"max_wealth_usd_m", type number},
+		                {"top_billionaire", type text},
+		                {"dominant_industry_by_wealth", type text},
+		                {"self_made_count", Int64.Type},
+		                {"self_made_ratio_pct", type number},
+		                {"mean_age", type number},
+		                {"country_wealth_gdp_pct", type number},
+		                {"billionaires_per_million_pop", type number},
+		                {"wealth_concentration_tier", type text},
+		                {"gdp_per_billionaire_bn", type number},
+		                {"sector_dominance_score", type number},
+		                {"gdp_usd", type number},
+		                {"population", Int64.Type},
+		                {"gdp_year", Int64.Type}
+		            },
+		            "en-US"
+		        ),
+		
+		    // ==================================================
+		    // 3. STANDARDIZE COUNTRY ATTRIBUTES
+		    // ==================================================
+		
+		    StandardizedCountry =
+		        Table.TransformColumns(
+		            ChangedTypes,
+		            {
+		                {
+		                    "country",
+		                    fn_StandardizeCountry,
+		                    type nullable text
+		                },
+		                {
+		                    "wb_country_name",
+		                    fn_StandardizeCountry,
+		                    type nullable text
+		                },
+		                {
+		                    "iso3",
+		                    each
+		                        if _ = null then
+		                            null
+		                        else
+		                            Text.Upper(Text.Trim(_)),
+		                    type nullable text
+		                }
+		            }
+		        )
+		
 		in
-		  #"Changed column type"
+		    StandardizedCountry
 	lineageTag: 02f911da-cc28-46af-b01a-f7e198d64f4e
 	queryGroup: 02_Staging
 
@@ -324,4 +441,52 @@ expression qa_CountryReconciliation =
 		  #"Added custom 2"
 	lineageTag: d32e7f72-5fed-4135-aead-000444168561
 	queryGroup: '05_QA & Reconciliation'
+
+expression tmp_StagingValidation =
+		let
+		    Individual =
+		        stg_BillionaireIndividual,
+		
+		    Country =
+		        stg_BillionaireCountry,
+		
+		    Validation =
+		        #table(
+		            type table [
+		                Table_Name = text,
+		                Actual_Rows = Int64.Type,
+		                Actual_Columns = Int64.Type,
+		                Expected_Rows = Int64.Type,
+		                Expected_Columns = Int64.Type,
+		                Status = text
+		            ],
+		            {
+		                {
+		                    "Individual",
+		                    Table.RowCount(Individual),
+		                    Table.ColumnCount(Individual),
+		                    3384,
+		                    25,
+		                    if Table.RowCount(Individual) = 3384
+		                        and Table.ColumnCount(Individual) = 25
+		                    then "Passed"
+		                    else "Investigate"
+		                },
+		                {
+		                    "Country",
+		                    Table.RowCount(Country),
+		                    Table.ColumnCount(Country),
+		                    80,
+		                    23,
+		                    if Table.RowCount(Country) = 80
+		                        and Table.ColumnCount(Country) = 23
+		                    then "Passed"
+		                    else "Investigate"
+		                }
+		            }
+		        )
+		in
+		    Validation
+	lineageTag: e73acd80-7563-4232-804d-f2ade8132cab
+	queryGroup: 99_Archive
 
