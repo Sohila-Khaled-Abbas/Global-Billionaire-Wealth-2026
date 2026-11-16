@@ -1259,3 +1259,257 @@ expression tmp_IndustryDistribution =
 
 	annotation PBI_ResultType = Table
 
+expression tmp_IndustryDistributionValidation =
+		let
+		    Lookup = int_IndustryLookup,
+		    Distribution = tmp_IndustryDistribution,
+		
+		    LookupLabels =
+		        List.RemoveNulls(
+		            Table.Column(Lookup, "industry")
+		        ),
+		
+		    DistributionLabels =
+		        List.RemoveNulls(
+		            Table.Column(
+		                Distribution,
+		                "primary_industry"
+		            )
+		        ),
+		
+		    LookupDistinct =
+		        List.Distinct(LookupLabels),
+		
+		    DistributionDistinct =
+		        List.Distinct(DistributionLabels),
+		
+		    TotalBillionaires =
+		        List.Sum(
+		            Table.Column(
+		                Distribution,
+		                "Billionaire_Count"
+		            )
+		        ),
+		
+		    LookupDuplicates =
+		        List.Count(LookupLabels)
+		        - List.Count(LookupDistinct),
+		
+		    MissingLookupLabels =
+		        List.Difference(
+		            DistributionDistinct,
+		            LookupDistinct
+		        ),
+		
+		    MissingDistributionLabels =
+		        List.Difference(
+		            LookupDistinct,
+		            DistributionDistinct
+		        ),
+		
+		    Result =
+		        #table(
+		            type table [
+		                Check = text,
+		                Actual = text,
+		                Expected = text,
+		                Status = text
+		            ],
+		            {
+		                {
+		                    "Industry lookup rows",
+		                    Text.From(Table.RowCount(Lookup)),
+		                    "18",
+		                    if Table.RowCount(Lookup) = 18
+		                    then "Passed" else "Investigate"
+		                },
+		                {
+		                    "Distinct lookup labels",
+		                    Text.From(List.Count(LookupDistinct)),
+		                    "18",
+		                    if List.Count(LookupDistinct) = 18
+		                    then "Passed" else "Investigate"
+		                },
+		                {
+		                    "Duplicate lookup labels",
+		                    Text.From(LookupDuplicates),
+		                    "0",
+		                    if LookupDuplicates = 0
+		                    then "Passed" else "Investigate"
+		                },
+		                {
+		                    "Distribution categories",
+		                    Text.From(List.Count(DistributionDistinct)),
+		                    "18",
+		                    if List.Count(DistributionDistinct) = 18
+		                    then "Passed" else "Investigate"
+		                },
+		                {
+		                    "Distribution total",
+		                    Text.From(TotalBillionaires),
+		                    "3384",
+		                    if TotalBillionaires = 3384
+		                    then "Passed" else "Investigate"
+		                },
+		                {
+		                    "Labels missing from lookup",
+		                    Text.From(List.Count(MissingLookupLabels)),
+		                    "0",
+		                    if List.IsEmpty(MissingLookupLabels)
+		                    then "Passed" else "Investigate"
+		                },
+		                {
+		                    "Labels missing from distribution",
+		                    Text.From(List.Count(MissingDistributionLabels)),
+		                    "0",
+		                    if List.IsEmpty(MissingDistributionLabels)
+		                    then "Passed" else "Investigate"
+		                }
+		            }
+		        )
+		in
+		    Result
+	lineageTag: c602daed-9cb1-4c0d-8edf-bd4e2c791df6
+	queryGroup: 99_Archive
+
+	annotation PBI_ResultType = Table
+
+expression tmp_IndividualQualityAudit =
+		let
+		    Source = stg_BillionaireIndividual,
+		
+		    // Count nulls in any selected column
+		    NullCount = (ColumnName as text) as number =>
+		        List.Count(
+		            List.Select(
+		                Table.Column(Source, ColumnName),
+		                each _ = null
+		            )
+		        ),
+		
+		    // Count non-positive values in numeric columns
+		    NonPositiveCount = (ColumnName as text) as number =>
+		        List.Count(
+		            List.Select(
+		                List.RemoveNulls(
+		                    Table.Column(Source, ColumnName)
+		                ),
+		                each _ <= 0
+		            )
+		        ),
+		
+		    // Retrieve distinct values for categorical columns
+		    DistinctValues = (ColumnName as text) as text =>
+		        let
+		            Values =
+		                List.Transform(
+		                    List.Distinct(
+		                        List.RemoveNulls(
+		                            Table.Column(Source, ColumnName)
+		                        )
+		                    ),
+		                    each Text.From(_)
+		                )
+		        in
+		            Text.Combine(List.Sort(Values), ", "),
+		
+		    AgeValues =
+		        List.RemoveNulls(
+		            Table.Column(Source, "age")
+		        ),
+		
+		    AgeMinimum =
+		        if List.IsEmpty(AgeValues)
+		        then null else List.Min(AgeValues),
+		
+		    AgeMaximum =
+		        if List.IsEmpty(AgeValues)
+		        then null else List.Max(AgeValues),
+		
+		    Result =
+		        #table(
+		            type table [
+		                Check = text,
+		                Actual_Value = text,
+		                Expected_or_Interpretation = text
+		            ],
+		            {
+		                {
+		                    "Age nulls",
+		                    Text.From(NullCount("age")),
+		                    "48 reported in dataset documentation"
+		                },
+		                {
+		                    "Minimum age",
+		                    if AgeMinimum = null then "N/A"
+		                    else Text.From(AgeMinimum),
+		                    "Review observed minimum"
+		                },
+		                {
+		                    "Maximum age",
+		                    if AgeMaximum = null then "N/A"
+		                    else Text.From(AgeMaximum),
+		                    "Review observed maximum"
+		                },
+		                {
+		                    "Gender nulls",
+		                    Text.From(NullCount("gender")),
+		                    "Investigate"
+		                },
+		                {
+		                    "Gender categories",
+		                    DistinctValues("gender"),
+		                    "Expected M, F"
+		                },
+		                {
+		                    "Self-made nulls",
+		                    Text.From(NullCount("self_made")),
+		                    "Investigate"
+		                },
+		                {
+		                    "Self-made categories",
+		                    DistinctValues("self_made"),
+		                    "Expected true, false"
+		                },
+		                {
+		                    "Net worth nulls",
+		                    Text.From(NullCount("net_worth_usd")),
+		                    "Investigate"
+		                },
+		                {
+		                    "Non-positive net worth",
+		                    Text.From(NonPositiveCount("net_worth_usd")),
+		                    "Investigate"
+		                },
+		                {
+		                    "GDP nulls",
+		                    Text.From(NullCount("gdp_usd")),
+		                    "Investigate"
+		                },
+		                {
+		                    "Non-positive GDP",
+		                    Text.From(NonPositiveCount("gdp_usd")),
+		                    "Investigate"
+		                },
+		                {
+		                    "Population nulls",
+		                    Text.From(NullCount("population")),
+		                    "Investigate"
+		                },
+		                {
+		                    "Non-positive population",
+		                    Text.From(NonPositiveCount("population")),
+		                    "Investigate"
+		                },
+		                {
+		                    "Primary industry nulls",
+		                    Text.From(NullCount("primary_industry")),
+		                    "Expected 0 based on previous audit"
+		                }
+		            }
+		        )
+		in
+		    Result
+	lineageTag: f5a0b9b5-d4ba-4232-91b8-aacdb9024b40
+	queryGroup: 99_Archive
+
