@@ -490,3 +490,317 @@ expression tmp_StagingValidation =
 	lineageTag: e73acd80-7563-4232-804d-f2ade8132cab
 	queryGroup: 99_Archive
 
+expression tmp_StagingHealth =
+		let
+		    // Staging tables
+		    Individual = stg_BillionaireIndividual,
+		    Country = stg_BillionaireCountry,
+		
+		    // Count rows containing errors
+		    IndividualErrors =
+		        Table.RowCount(
+		            Table.SelectRowsWithErrors(Individual)
+		        ),
+		
+		    CountryErrors =
+		        Table.RowCount(
+		            Table.SelectRowsWithErrors(Country)
+		        ),
+		
+		    // Inspect timestamp type
+		    TimestampValues =
+		        List.RemoveNulls(
+		            Table.Column(Individual, "scrape_timestamp")
+		        ),
+		
+		    TimestampSample =
+		        if List.IsEmpty(TimestampValues) then
+		            null
+		        else
+		            List.First(TimestampValues),
+		
+		    TimestampIsZone =
+		        if TimestampSample = null then
+		            false
+		        else
+		            Value.Is(TimestampSample, type datetimezone),
+		
+		    TimestampCheck =
+		        if TimestampSample = null then
+		            "No non-null timestamp"
+		        else if TimestampIsZone then
+		            DateTimeZone.ToText(
+		                TimestampSample,
+		                [Culture = "en-US"]
+		            )
+		        else
+		            "Not datetimezone",
+		
+		    // Overall validation
+		    IndividualStatus =
+		        if Table.RowCount(Individual) = 3384
+		            and Table.ColumnCount(Individual) = 25
+		            and IndividualErrors = 0
+		            and TimestampIsZone
+		        then "Passed"
+		        else "Investigate",
+		
+		    CountryStatus =
+		        if Table.RowCount(Country) = 80
+		            and Table.ColumnCount(Country) = 23
+		            and CountryErrors = 0
+		        then "Passed"
+		        else "Investigate",
+		
+		    // Validation output
+		    Result =
+		        #table(
+		            type table [
+		                Table_Name = text,
+		                Actual_Rows = Int64.Type,
+		                Actual_Columns = Int64.Type,
+		                Rows_With_Errors = Int64.Type,
+		                Timestamp_Check = text,
+		                Status = text
+		            ],
+		            {
+		                {
+		                    "Individual",
+		                    Table.RowCount(Individual),
+		                    Table.ColumnCount(Individual),
+		                    IndividualErrors,
+		                    TimestampCheck,
+		                    IndividualStatus
+		                },
+		                {
+		                    "Country",
+		                    Table.RowCount(Country),
+		                    Table.ColumnCount(Country),
+		                    CountryErrors,
+		                    "Not applicable",
+		                    CountryStatus
+		                }
+		            }
+		        )
+		in
+		    Result
+	lineageTag: 939a286d-9d70-45a4-a1d6-577609723b21
+	queryGroup: 99_Archive
+
+	annotation PBI_ResultType = Table
+
+expression tmp_KeyAudit =
+		let
+		    // =========================================
+		    // 1. INPUT TABLES
+		    // =========================================
+		
+		    Individual =
+		        stg_BillionaireIndividual,
+		
+		    Country =
+		        stg_BillionaireCountry,
+		
+		    // =========================================
+		    // 2. INDIVIDUAL PROFILE URI
+		    // =========================================
+		
+		    URIValues =
+		        List.Transform(
+		            Table.Column(Individual, "forbes_uri"),
+		            each
+		                if _ = null then
+		                    null
+		                else
+		                    Text.Trim(Text.From(_))
+		        ),
+		
+		    ValidURIs =
+		        List.Select(
+		            URIValues,
+		            each _ <> null and _ <> ""
+		        ),
+		
+		    DistinctURIs =
+		        List.Distinct(ValidURIs),
+		
+		    MissingURICount =
+		        Table.RowCount(Individual)
+		            - List.Count(ValidURIs),
+		
+		    DuplicateURIExcess =
+		        List.Count(ValidURIs)
+		            - List.Count(DistinctURIs),
+		
+		    // =========================================
+		    // 3. NORMALIZE COUNTRY KEYS FOR COMPARISON
+		    // =========================================
+		
+		    NormalizeISO3 =
+		        (Values as list) as list =>
+		            List.Transform(
+		                Values,
+		                each
+		                    if _ = null then
+		                        null
+		                    else
+		                        let
+		                            Code =
+		                                Text.Upper(
+		                                    Text.Trim(
+		                                        Text.From(_)
+		                                    )
+		                                )
+		                        in
+		                            if Code = "" then null
+		                            else Code
+		            ),
+		
+		    IndividualISO3 =
+		        NormalizeISO3(
+		            Table.Column(Individual, "iso3")
+		        ),
+		
+		    CountryISO3 =
+		        NormalizeISO3(
+		            Table.Column(Country, "iso3")
+		        ),
+		
+		    ValidIndividualISO3 =
+		        List.RemoveNulls(IndividualISO3),
+		
+		    ValidCountryISO3 =
+		        List.RemoveNulls(CountryISO3),
+		
+		    DistinctIndividualISO3 =
+		        List.Distinct(ValidIndividualISO3),
+		
+		    DistinctCountryISO3 =
+		        List.Distinct(ValidCountryISO3),
+		
+		    MissingIndividualISO3 =
+		        Table.RowCount(Individual)
+		            - List.Count(ValidIndividualISO3),
+		
+		    MissingCountryISO3 =
+		        Table.RowCount(Country)
+		            - List.Count(ValidCountryISO3),
+		
+		    DuplicateIndividualISO3 =
+		        List.Count(ValidIndividualISO3)
+		            - List.Count(DistinctIndividualISO3),
+		
+		    DuplicateCountryISO3 =
+		        List.Count(ValidCountryISO3)
+		            - List.Count(DistinctCountryISO3),
+		
+		    // =========================================
+		    // 4. COUNTRY MATCHING
+		    // =========================================
+		
+		    IndividualOnlyCountries =
+		        List.Difference(
+		            DistinctIndividualISO3,
+		            DistinctCountryISO3
+		        ),
+		
+		    AggregateOnlyCountries =
+		        List.Difference(
+		            DistinctCountryISO3,
+		            DistinctIndividualISO3
+		        ),
+		
+		    // =========================================
+		    // 5. OUTPUT
+		    // =========================================
+		
+		    Result =
+		        #table(
+		            type table [
+		                Check = text,
+		                Result_Value = text,
+		                Status = text
+		            ],
+		            {
+		                {
+		                    "Individual rows",
+		                    Text.From(Table.RowCount(Individual)),
+		                    "Information"
+		                },
+		                {
+		                    "Forbes URI missing",
+		                    Text.From(MissingURICount),
+		                    if MissingURICount = 0
+		                    then "Passed"
+		                    else "Investigate"
+		                },
+		                {
+		                    "Forbes URI duplicate excess",
+		                    Text.From(DuplicateURIExcess),
+		                    if DuplicateURIExcess = 0
+		                    then "Passed"
+		                    else "Investigate"
+		                },
+		                {
+		                    "Individual ISO3 missing",
+		                    Text.From(MissingIndividualISO3),
+		                    if MissingIndividualISO3 = 0
+		                    then "Passed"
+		                    else "Investigate"
+		                },
+		                {
+		                    "Individual distinct countries",
+		                    Text.From(List.Count(DistinctIndividualISO3)),
+		                    "Information"
+		                },
+		                {
+		                    "Individual ISO3 duplicate excess",
+		                    Text.From(DuplicateIndividualISO3),
+		                    "Information"
+		                },
+		                {
+		                    "Country ISO3 missing",
+		                    Text.From(MissingCountryISO3),
+		                    if MissingCountryISO3 = 0
+		                    then "Passed"
+		                    else "Investigate"
+		                },
+		                {
+		                    "Country distinct ISO3",
+		                    Text.From(List.Count(DistinctCountryISO3)),
+		                    "Information"
+		                },
+		                {
+		                    "Country ISO3 duplicate excess",
+		                    Text.From(DuplicateCountryISO3),
+		                    if DuplicateCountryISO3 = 0
+		                    then "Passed"
+		                    else "Investigate"
+		                },
+		                {
+		                    "Individual-only ISO3 codes",
+		                    Text.Combine(
+		                        List.Sort(IndividualOnlyCountries),
+		                        ", "
+		                    ),
+		                    if List.Count(IndividualOnlyCountries) = 0
+		                    then "Passed"
+		                    else "Investigate"
+		                },
+		                {
+		                    "Aggregate-only ISO3 codes",
+		                    Text.Combine(
+		                        List.Sort(AggregateOnlyCountries),
+		                        ", "
+		                    ),
+		                    if List.Count(AggregateOnlyCountries) = 0
+		                    then "Passed"
+		                    else "Investigate"
+		                }
+		            }
+		        )
+		in
+		    Result
+	lineageTag: 3b3911b1-e9fd-4b7d-a898-3bdadda92f2f
+	queryGroup: 99_Archive
+
