@@ -6,7 +6,7 @@ expression stg_BillionaireIndividual =
 		in
 		  #"Changed column type"
 	lineageTag: ad148b8f-1bd9-4df2-8883-b843aafbba2c
-	queryGroup: Staging
+	queryGroup: 02_Staging
 
 	annotation PBI_ResultType = Table
 
@@ -18,7 +18,7 @@ expression stg_BillionaireCountry =
 		in
 		  #"Changed column type"
 	lineageTag: 02f911da-cc28-46af-b01a-f7e198d64f4e
-	queryGroup: Staging
+	queryGroup: 02_Staging
 
 	annotation PBI_ResultType = Table
 
