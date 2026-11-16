@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Global Billionaire Wealth Documentation
+    url: https://github.com/
+    about: Read the project documentation, data dictionary, and methodology.
+  - name: Raw Data Source (Kaggle)
+    url: https://www.kaggle.com/datasets/kanchana1990/global-billionaire-wealth-to-gdp-2026/data
+    about: Access the official Kaggle dataset by kanchana1990.

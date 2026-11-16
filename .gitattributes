@@ -1,0 +1,32 @@
+# ==============================================================================
+# Global Billionaire Wealth 2026 - .gitattributes
+# ==============================================================================
+
+# Auto-detect text files and normalize line endings to LF
+* text=auto eol=lf
+
+# Explicit Text Formats
+*.md text diff=markdown
+*.csv text diff=csv
+*.json text
+*.yaml text
+*.yml text
+*.tmdl text
+*.pbism text
+*.pbir text
+*.platform text
+*.py text diff=python
+*.sh text eol=lf
+*.bat text eol=crlf
+*.ps1 text eol=crlf
+
+# Binary Formats (Preserve bit-exact content)
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.svg text
+*.ico binary
+*.pbix binary
+*.pbit binary
+*.abf binary
+*.pdf binary

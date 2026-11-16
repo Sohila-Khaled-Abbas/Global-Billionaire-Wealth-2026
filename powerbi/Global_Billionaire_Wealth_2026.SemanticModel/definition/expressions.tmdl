@@ -1,0 +1,24 @@
+expression stg_BillionaireIndividual =
+		let
+		  Source = Csv.Document(File.Contents("D:\courses\Data Analysis 26-27\Projects\Global-Billionaire-Wealth-2026\data\raw\billionaire_individual_2026.csv"), [Delimiter = ",", Columns = 25, Encoding = 65001, QuoteStyle = QuoteStyle.None]),
+		  #"Promoted headers" = Table.PromoteHeaders(Source, [PromoteAllScalars = true]),
+		  #"Changed column type" = Table.TransformColumnTypes(#"Promoted headers", {{"rank", Int64.Type}, {"person_name", type text}, {"gender", type text}, {"age", Int64.Type}, {"country", type text}, {"iso3", type text}, {"wb_country_name", type text}, {"state", type text}, {"city", type text}, {"net_worth_usd_m", type number}, {"net_worth_usd", Int64.Type}, {"source_of_wealth", type text}, {"industries", type text}, {"primary_industry", type text}, {"self_made", type logical}, {"wealth_gdp_ratio_pct", type number}, {"wealth_per_citizen_usd", type number}, {"wealth_country_share_pct", type number}, {"sector_dominance_score", type number}, {"gdp_usd", type number}, {"population", Int64.Type}, {"gdp_year", Int64.Type}, {"forbes_uri", type text}, {"scrape_timestamp", type text}, {"birth_year", Int64.Type}}, "en-US")
+		in
+		  #"Changed column type"
+	lineageTag: ad148b8f-1bd9-4df2-8883-b843aafbba2c
+	queryGroup: Staging
+
+	annotation PBI_ResultType = Table
+
+expression stg_BillionaireCountry =
+		let
+		  Source = Csv.Document(File.Contents("D:\courses\Data Analysis 26-27\Projects\Global-Billionaire-Wealth-2026\data\raw\billionaire_country_aggregate_2026.csv"), [Delimiter = ",", Columns = 23, Encoding = 65001, QuoteStyle = QuoteStyle.None]),
+		  #"Promoted headers" = Table.PromoteHeaders(Source, [PromoteAllScalars = true]),
+		  #"Changed column type" = Table.TransformColumnTypes(#"Promoted headers", {{"country_wealth_rank", Int64.Type}, {"country", type text}, {"iso3", type text}, {"wb_country_name", type text}, {"billionaire_count", Int64.Type}, {"total_wealth_usd_m", type number}, {"total_wealth_usd", Int64.Type}, {"mean_wealth_usd_m", type number}, {"median_wealth_usd_m", type number}, {"max_wealth_usd_m", type number}, {"top_billionaire", type text}, {"dominant_industry_by_wealth", type text}, {"self_made_count", Int64.Type}, {"self_made_ratio_pct", type number}, {"mean_age", type number}, {"country_wealth_gdp_pct", type number}, {"billionaires_per_million_pop", type number}, {"wealth_concentration_tier", type text}, {"gdp_per_billionaire_bn", type number}, {"sector_dominance_score", type number}, {"gdp_usd", type number}, {"population", Int64.Type}, {"gdp_year", Int64.Type}}, "en-US")
+		in
+		  #"Changed column type"
+	lineageTag: 02f911da-cc28-46af-b01a-f7e198d64f4e
+	queryGroup: Staging
+
+	annotation PBI_ResultType = Table
+

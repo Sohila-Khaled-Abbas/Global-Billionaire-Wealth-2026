@@ -1,0 +1,93 @@
+# ==============================================================================
+# Global Billionaire Wealth 2026 - Root .gitignore
+# ==============================================================================
+
+# --- Power BI PBIP Developer Mode & Semantic Models ---
+**/cache.abf
+**/*.abf
+**/localSettings.json
+**/*.pbi/localSettings.json
+**/*.pbi/editorSettings.json
+**/*.pbi/cache.abf
+**/tempReportingPlatform*
+*.tmp
+*.temp
+
+# --- Power BI Desktop Lock & Auto-Recovery ---
+~$*.pbix
+~$*.pbit
+~$*.pbip
+*.pbix.auto
+*.pbi.bak
+
+# --- Python & Data Science Virtual Environments ---
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+ENV/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# --- Jupyter Notebooks ---
+.ipynb_checkpoints
+*/.ipynb_checkpoints/*
+
+# --- Testing & Code Quality ---
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+
+# --- Environment & Sensitive Keys ---
+.env
+.env.local
+*.secret
+*.pem
+*.key
+
+# --- Operating System Artifacts ---
+# Windows
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+[Dd]esktop.ini
+$RECYCLE.BIN/
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# Linux
+*~
+
+# --- IDE & Code Editors ---
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+.idea/
+*.sublime-project
+*.sublime-workspace
