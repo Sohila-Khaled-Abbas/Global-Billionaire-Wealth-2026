@@ -1,10 +1,84 @@
 expression stg_BillionaireIndividual =
 		let
-		  Source = Csv.Document(File.Contents("D:\courses\Data Analysis 26-27\Projects\Global-Billionaire-Wealth-2026\data\raw\billionaire_individual_2026.csv"), [Delimiter = ",", Columns = 25, Encoding = 65001, QuoteStyle = QuoteStyle.None]),
-		  #"Promoted headers" = Table.PromoteHeaders(Source, [PromoteAllScalars = true]),
-		  #"Changed column type" = Table.TransformColumnTypes(#"Promoted headers", {{"rank", Int64.Type}, {"person_name", type text}, {"gender", type text}, {"age", Int64.Type}, {"country", type text}, {"iso3", type text}, {"wb_country_name", type text}, {"state", type text}, {"city", type text}, {"net_worth_usd_m", type number}, {"net_worth_usd", Int64.Type}, {"source_of_wealth", type text}, {"industries", type text}, {"primary_industry", type text}, {"self_made", type logical}, {"wealth_gdp_ratio_pct", type number}, {"wealth_per_citizen_usd", type number}, {"wealth_country_share_pct", type number}, {"sector_dominance_score", type number}, {"gdp_usd", type number}, {"population", Int64.Type}, {"gdp_year", Int64.Type}, {"forbes_uri", type text}, {"scrape_timestamp", type text}, {"birth_year", Int64.Type}}, "en-US")
+		    // ==================================================
+		    // 1. SOURCE
+		    // Reference the validated source-layer query
+		    // ==================================================
+		
+		    Source =
+		        src_BillionaireIndividual,
+		
+		    // ==================================================
+		    // 2. EXPLICIT DATA TYPES
+		    // Prevent automatic and inconsistent type detection
+		    // ==================================================
+		
+		    ChangedTypes =
+		        Table.TransformColumnTypes(
+		            Source,
+		            {
+		                {"rank", Int64.Type},
+		                {"person_name", type text},
+		                {"gender", type text},
+		                {"age", Int64.Type},
+		                {"birth_year", Int64.Type},
+		                {"country", type text},
+		                {"iso3", type text},
+		                {"wb_country_name", type text},
+		                {"state", type text},
+		                {"city", type text},
+		                {"net_worth_usd_m", type number},
+		                {"net_worth_usd", type number},
+		                {"source_of_wealth", type text},
+		                {"industries", type text},
+		                {"primary_industry", type text},
+		                {"self_made", type logical},
+		                {"wealth_gdp_ratio_pct", type number},
+		                {"wealth_per_citizen_usd", type number},
+		                {"wealth_country_share_pct", type number},
+		                {"sector_dominance_score", type number},
+		                {"gdp_usd", type number},
+		                {"population", Int64.Type},
+		                {"gdp_year", Int64.Type},
+		                {"forbes_uri", type text},
+		                {"scrape_timestamp", type text}
+		            },
+		            "en-US"
+		        ),
+		
+		    // ==================================================
+		    // 3. STANDARDIZE COUNTRY LABELS AND ISO3
+		    // Reuse the custom function built in Phase 1
+		    // ==================================================
+		
+		    StandardizedCountry =
+		        Table.TransformColumns(
+		            ChangedTypes,
+		            {
+		                {
+		                    "country",
+		                    fn_StandardizeCountry,
+		                    type nullable text
+		                },
+		                {
+		                    "wb_country_name",
+		                    fn_StandardizeCountry,
+		                    type nullable text
+		                },
+		                {
+		                    "iso3",
+		                    each
+		                        if _ = null then
+		                            null
+		                        else
+		                            Text.Upper(Text.Trim(_)),
+		                    type nullable text
+		                }
+		            }
+		        )
+		
 		in
-		  #"Changed column type"
+		    StandardizedCountry
 	lineageTag: ad148b8f-1bd9-4df2-8883-b843aafbba2c
 	queryGroup: 02_Staging
 
