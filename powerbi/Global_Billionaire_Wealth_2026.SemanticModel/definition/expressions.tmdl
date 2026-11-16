@@ -38,3 +38,45 @@ expression p_SnapshotDate =
 	lineageTag: fbec51b0-f767-4b1c-9ad4-881658b8a8d1
 	queryGroup: '00_Parameters & Functions'
 
+expression fn_StandardizeCountry =
+		let
+		    Source = (CountryName as nullable text) as nullable text =>
+		if CountryName = null then
+		    null
+		else
+		    let
+		        // Replace non-breaking spaces with regular spaces
+		        ReplaceNBSP =
+		            Text.Replace(
+		                CountryName,
+		                Character.FromNumber(160),
+		                " "
+		            ),
+		
+		        // Remove non-printable characters
+		        CleanText =
+		            Text.Clean(ReplaceNBSP),
+		
+		        // Remove leading and trailing spaces
+		        TrimText =
+		            Text.Trim(CleanText),
+		
+		        // Split and remove empty tokens
+		        Words =
+		            List.Select(
+		                Text.Split(TrimText, " "),
+		                each _ <> ""
+		            ),
+		
+		        // Reconstruct with single spaces
+		        StandardizedCountry =
+		            Text.Combine(Words, " ")
+		    in
+		        StandardizedCountry
+		in
+		    Source
+	lineageTag: 0d60decd-36be-49ec-b81a-963ca6aff604
+	queryGroup: '00_Parameters & Functions'
+
+	annotation PBI_ResultType = Function
+
