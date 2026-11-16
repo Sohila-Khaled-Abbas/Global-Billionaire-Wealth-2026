@@ -1513,3 +1513,211 @@ expression tmp_IndividualQualityAudit =
 	lineageTag: f5a0b9b5-d4ba-4232-91b8-aacdb9024b40
 	queryGroup: 99_Archive
 
+expression tmp_NetWorthExceptions =
+		let
+		    // 1. Source
+		    Source =
+		        stg_BillionaireIndividual,
+		
+		    // 2. Keep investigation fields
+		    SelectedColumns =
+		        Table.SelectColumns(
+		            Source,
+		            {
+		                "rank",
+		                "person_name",
+		                "country",
+		                "iso3",
+		                "forbes_uri",
+		                "net_worth_usd",
+		                "net_worth_usd_m"
+		            }
+		        ),
+		
+		    // 3. Classify absolute USD values
+		    USDStatus =
+		        Table.AddColumn(
+		            SelectedColumns,
+		            "USD_Status",
+		            each
+		                if [net_worth_usd] = null then
+		                    "Missing"
+		                else if [net_worth_usd] = 0 then
+		                    "Zero"
+		                else if [net_worth_usd] < 0 then
+		                    "Negative"
+		                else
+		                    "Positive",
+		            type text
+		        ),
+		
+		    // 4. Classify USD millions
+		    MillionsStatus =
+		        Table.AddColumn(
+		            USDStatus,
+		            "USD_Millions_Status",
+		            each
+		                if [net_worth_usd_m] = null then
+		                    "Missing"
+		                else if [net_worth_usd_m] = 0 then
+		                    "Zero"
+		                else if [net_worth_usd_m] < 0 then
+		                    "Negative"
+		                else
+		                    "Positive",
+		            type text
+		        ),
+		
+		    // 5. Recalculate USD from millions
+		    RecalculatedUSD =
+		        Table.AddColumn(
+		            MillionsStatus,
+		            "USD_Recalculated",
+		            each
+		                if [net_worth_usd_m] = null then
+		                    null
+		                else
+		                    [net_worth_usd_m] * 1000000,
+		            type nullable number
+		        ),
+		
+		    // 6. Calculate absolute difference
+		    Difference =
+		        Table.AddColumn(
+		            RecalculatedUSD,
+		            "Absolute_Difference_USD",
+		            each
+		                if [net_worth_usd] = null
+		                    or [USD_Recalculated] = null
+		                then
+		                    null
+		                else
+		                    Number.Abs(
+		                        [net_worth_usd]
+		                            - [USD_Recalculated]
+		                    ),
+		            type nullable number
+		        ),
+		
+		    // 7. Retain anomalous records
+		    Exceptions =
+		        Table.SelectRows(
+		            Difference,
+		            each
+		                [USD_Status] <> "Positive"
+		                or [USD_Millions_Status] <> "Positive"
+		        ),
+		
+		    // 8. Sort by Forbes rank
+		    Sorted =
+		        Table.Sort(
+		            Exceptions,
+		            {{"rank", Order.Ascending}}
+		        )
+		
+		in
+		    Sorted
+	lineageTag: 161f5679-4921-440c-ba58-eb1c2b02eb6e
+	queryGroup: 99_Archive
+
+	annotation PBI_ResultType = Table
+
+expression tmp_NetWorthConsistency =
+		let
+		    Source =
+		        stg_BillionaireIndividual,
+		
+		    // Retain records with positive values in both columns
+		    PositiveRecords =
+		        Table.SelectRows(
+		            Source,
+		            each
+		                [net_worth_usd] <> null
+		                and [net_worth_usd_m] <> null
+		                and [net_worth_usd] > 0
+		                and [net_worth_usd_m] > 0
+		        ),
+		
+		    // Recalculate USD from USD millions
+		    Recalculated =
+		        Table.AddColumn(
+		            PositiveRecords,
+		            "Recalculated_USD",
+		            each
+		                [net_worth_usd_m] * 1000000,
+		            type number
+		        ),
+		
+		    // Calculate difference
+		    Difference =
+		        Table.AddColumn(
+		            Recalculated,
+		            "Absolute_Difference_USD",
+		            each
+		                Number.Abs(
+		                    [net_worth_usd] - [Recalculated_USD]
+		                ),
+		            type number
+		        ),
+		
+		    // Sort largest discrepancies first
+		    Sorted =
+		        Table.Sort(
+		            Difference,
+		            {
+		                {"Absolute_Difference_USD", Order.Descending}
+		            }
+		        ),
+		
+		    // Keep relevant investigation fields
+		    Output =
+		        Table.SelectColumns(
+		            Sorted,
+		            {
+		                "forbes_uri",
+		                "person_name",
+		                "net_worth_usd",
+		                "net_worth_usd_m",
+		                "Recalculated_USD",
+		                "Absolute_Difference_USD"
+		            }
+		        )
+		in
+		    Output
+	lineageTag: c5a27da5-aa43-4fd6-9cfb-0f24be421af7
+	queryGroup: 99_Archive
+
+expression tmp_RankAudit =
+		let
+		    Source =
+		        stg_BillionaireIndividual,
+		
+		    RankCounts =
+		        Table.Group(
+		            Source,
+		            {"rank"},
+		            {
+		                {
+		                    "Records_Per_Rank",
+		                    each Table.RowCount(_),
+		                    Int64.Type
+		                }
+		            }
+		        ),
+		
+		    DuplicateRanks =
+		        Table.SelectRows(
+		            RankCounts,
+		            each [Records_Per_Rank] > 1
+		        ),
+		
+		    Sorted =
+		        Table.Sort(
+		            DuplicateRanks,
+		            {{"rank", Order.Ascending}}
+		        )
+		in
+		    Sorted
+	lineageTag: f614d10f-a3c2-4bef-8e54-d3d1a2b2b507
+	queryGroup: 99_Archive
+
