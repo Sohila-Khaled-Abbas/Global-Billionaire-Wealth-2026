@@ -1164,3 +1164,85 @@ expression tmp_IndustryDelimiterAudit =
 
 	annotation PBI_ResultType = Table
 
+expression int_IndustryLookup =
+		let
+		    Source =
+		        stg_BillionaireIndividual,
+		
+		    SelectedColumns =
+		        Table.SelectColumns(
+		            Source,
+		            {"primary_industry"}
+		        ),
+		
+		    CleanIndustry =
+		        Table.TransformColumns(
+		            SelectedColumns,
+		            {
+		                {
+		                    "primary_industry",
+		                    each
+		                        if _ = null then
+		                            null
+		                        else
+		                            let
+		                                ReplacedNBSP =
+		                                    Text.Replace(
+		                                        _,
+		                                        Character.FromNumber(160),
+		                                        " "
+		                                    ),
+		
+		                                CleanText =
+		                                    Text.Clean(ReplacedNBSP),
+		
+		                                TrimmedText =
+		                                    Text.Trim(CleanText),
+		
+		                                Words =
+		                                    List.Select(
+		                                        Text.Split(TrimmedText, " "),
+		                                        each _ <> ""
+		                                    )
+		                            in
+		                                Text.Combine(Words, " "),
+		                    type nullable text
+		                }
+		            }
+		        ),
+		
+		    FilterValidIndustry =
+		        Table.SelectRows(
+		            CleanIndustry,
+		            each
+		                [primary_industry] <> null
+		                and [primary_industry] <> ""
+		        ),
+		
+		    RenamedColumn =
+		        Table.RenameColumns(
+		            FilterValidIndustry,
+		            {
+		                {"primary_industry", "industry"}
+		            }
+		        ),
+		
+		    DistinctIndustries =
+		        Table.Distinct(
+		            RenamedColumn,
+		            {"industry"}
+		        ),
+		
+		    SortedIndustries =
+		        Table.Sort(
+		            DistinctIndustries,
+		            {{"industry", Order.Ascending}}
+		        )
+		
+		in
+		    SortedIndustries
+	lineageTag: 37eef682-ae30-48c5-a710-32590e087ecf
+	queryGroup: 03_Transformations
+
+	annotation PBI_ResultType = Table
+
