@@ -2037,3 +2037,154 @@ expression tmp_AgeBirthYearAudit =
 
 	annotation PBI_ResultType = Table
 
+expression tmp_CountryNullAudit =
+		let
+		    Source =
+		        stg_BillionaireCountry,
+		
+		    // Count nulls and blank text values
+		    CountMissing =
+		        (ColumnName as text) as number =>
+		            List.Count(
+		                List.Select(
+		                    Table.Column(Source, ColumnName),
+		                    (CurrentValue) =>
+		                        if CurrentValue = null then
+		                            true
+		                        else if Value.Is(CurrentValue, type text) then
+		                            Text.Trim(CurrentValue) = ""
+		                        else
+		                            false
+		                )
+		            ),
+		
+		    // Audit every column dynamically
+		    AuditRows =
+		        List.Transform(
+		            Table.ColumnNames(Source),
+		            (ColumnName) =>
+		                let
+		                    MissingCount =
+		                        CountMissing(ColumnName)
+		                in
+		                    [
+		                        Column_Name = ColumnName,
+		                        Missing_Or_Blank_Count = MissingCount,
+		                        Status =
+		                            if MissingCount = 0 then
+		                                "Passed"
+		                            else
+		                                "Investigate"
+		                    ]
+		        ),
+		
+		    Result =
+		        Table.FromRecords(AuditRows)
+		in
+		    Result
+	lineageTag: 5f78a27e-9094-4160-b5b7-d4ac69754390
+	queryGroup: 99_Archive
+
+	annotation PBI_ResultType = Table
+
+expression tmp_CountryNumericAudit =
+		let
+		    Source =
+		        stg_BillionaireCountry,
+		
+		    CountInvalid =
+		        (ColumnName as text) as number =>
+		            List.Count(
+		                List.Select(
+		                    List.RemoveNulls(
+		                        Table.Column(Source, ColumnName)
+		                    ),
+		                    each _ <= 0
+		                )
+		            ),
+		
+		    InvalidRange =
+		        (ColumnName as text, Minimum as number, Maximum as number) as number =>
+		            List.Count(
+		                List.Select(
+		                    List.RemoveNulls(
+		                        Table.Column(Source, ColumnName)
+		                    ),
+		                    each _ < Minimum or _ > Maximum
+		                )
+		            ),
+		
+		    Result =
+		        #table(
+		            type table [
+		                Check = text,
+		                Invalid_Count = Int64.Type,
+		                Rule = text
+		            ],
+		            {
+		                {
+		                    "Billionaire count",
+		                    CountInvalid("billionaire_count"),
+		                    "Must be greater than zero"
+		                },
+		                {
+		                    "Total wealth USD",
+		                    CountInvalid("total_wealth_usd"),
+		                    "Must be greater than zero"
+		                },
+		                {
+		                    "GDP",
+		                    CountInvalid("gdp_usd"),
+		                    "Must be greater than zero"
+		                },
+		                {
+		                    "Population",
+		                    CountInvalid("population"),
+		                    "Must be greater than zero"
+		                },
+		                {
+		                    "Self-made count",
+		                    List.Count(
+		                        List.Select(
+		                            Table.ToRecords(Source),
+		                            each
+		                                [self_made_count] < 0
+		                                or [self_made_count] > [billionaire_count]
+		                        )
+		                    ),
+		                    "Between zero and billionaire count"
+		                },
+		                {
+		                    "Mean wealth",
+		                    CountInvalid("mean_wealth_usd_m"),
+		                    "Must be greater than zero"
+		                },
+		                {
+		                    "Median wealth",
+		                    CountInvalid("median_wealth_usd_m"),
+		                    "Must be greater than zero"
+		                },
+		                {
+		                    "Maximum wealth",
+		                    CountInvalid("max_wealth_usd_m"),
+		                    "Must be greater than zero"
+		                },
+		                {
+		                    "Self-made ratio",
+		                    InvalidRange("self_made_ratio_pct", 0, 100),
+		                    "Between 0 and 100 percent"
+		                },
+		                {
+		                    "Sector dominance score",
+		                    InvalidRange("sector_dominance_score", 0, 100),
+		                    "Between 0 and 100"
+		                }
+		            }
+		        )
+		in
+		    Result
+	lineageTag: 892ad27e-93f2-4186-b64f-90bb6526571e
+	queryGroup: 99_Archive
+
+	annotation PBI_ResultType = Table
+
