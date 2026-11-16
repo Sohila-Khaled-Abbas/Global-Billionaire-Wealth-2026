@@ -45,7 +45,7 @@ queryGroup 99_Archive
 
 annotation __PBI_TimeIntelligenceEnabled = 0
 
-annotation PBI_QueryOrder = ["src_BillionaireIndividual","src_BillionaireCountry","stg_BillionaireIndividual","stg_BillionaireCountry","p_DataFolderPath","p_SnapshotDate","fn_StandardizeCountry","fn_ParseIndustries","tmp_SourceValidation","tmp_StagingValidation","tmp_StagingHealth","tmp_KeyAudit","tmp_IndustryFunctionTest","qa_IndividualByCountry","qa_CountryAggregate","qa_CountryReconciliation"]
+annotation PBI_QueryOrder = ["src_BillionaireIndividual","src_BillionaireCountry","stg_BillionaireIndividual","stg_BillionaireCountry","p_DataFolderPath","p_SnapshotDate","fn_StandardizeCountry","fn_ParseIndustries","tmp_SourceValidation","tmp_StagingValidation","tmp_StagingHealth","tmp_KeyAudit","tmp_IndustryFunctionTest","tmp_IndustryCoverage","qa_IndividualByCountry","qa_CountryAggregate","qa_CountryReconciliation","int_BillionaireIndustryBridge"]
 
 annotation PBI_ProTooling = ["DevMode"]
 

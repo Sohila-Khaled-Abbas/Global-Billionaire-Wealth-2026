@@ -894,3 +894,104 @@ expression tmp_IndustryFunctionTest =
 
 	annotation PBI_ResultType = Table
 
+expression tmp_IndustryCoverage =
+		let
+		    Source =
+		        stg_BillionaireIndividual,
+		
+		    AddedIndustryLists =
+		        Table.AddColumn(
+		            Source,
+		            "IndustryList",
+		            each fn_ParseIndustries([industries]),
+		            type list
+		        ),
+		
+		    AllLists =
+		        Table.Column(
+		            AddedIndustryLists,
+		            "IndustryList"
+		        ),
+		
+		    MappedIndividuals =
+		        Table.SelectRows(
+		            AddedIndustryLists,
+		            each List.Count([IndustryList]) > 0
+		        ),
+		
+		    TotalIndividuals =
+		        Table.RowCount(AddedIndustryLists),
+		
+		    MappedCount =
+		        Table.RowCount(MappedIndividuals),
+		
+		    UnmappedCount =
+		        TotalIndividuals - MappedCount,
+		
+		    AllIndustryLabels =
+		        List.Combine(AllLists),
+		
+		    DistinctIndustries =
+		        List.Distinct(AllIndustryLabels),
+		
+		    MembershipCount =
+		        List.Sum(
+		            List.Transform(
+		                AllLists,
+		                each List.Count(_)
+		            )
+		        ),
+		
+		    CoveragePercentage =
+		        if TotalIndividuals = 0 then
+		            null
+		        else
+		            Number.Round(
+		                MappedCount / TotalIndividuals * 100,
+		                2
+		            ),
+		
+		    Result =
+		        #table(
+		            type table [
+		                Metric = text,
+		                Value = number
+		            ],
+		            {
+		                {"Total Individuals", TotalIndividuals},
+		                {"Individuals With Industry", MappedCount},
+		                {"Individuals Without Industry", UnmappedCount},
+		                {"Total Person-Industry Memberships", MembershipCount},
+		                {"Distinct Industry Labels", List.Count(DistinctIndustries)},
+		                {"Industry Coverage Percentage", CoveragePercentage}
+		            }
+		        )
+		in
+		    Result
+	lineageTag: fe419ccd-d367-4b47-a5fc-55a5a71d5ece
+	queryGroup: 99_Archive
+
+	annotation PBI_ResultType = Table
+
+expression int_BillionaireIndustryBridge =
+		let
+		    Source = stg_BillionaireIndividual,
+		    #"Choose columns" = Table.SelectColumns(Source, {"industries", "forbes_uri"}),
+		    #"Invoked custom function" = Table.AddColumn(
+		        #"Choose columns",
+		        "Invoked custom function",
+		        each fn_ParseIndustries([industries]),
+		        type list
+		    ),
+		  #"Expanded Invoked custom function" = Table.ExpandListColumn(#"Invoked custom function", "Invoked custom function"),
+		  #"Renamed columns" = Table.RenameColumns(#"Expanded Invoked custom function", {{"Invoked custom function", "industry"}}),
+		  #"Removed columns" = Table.RemoveColumns(#"Renamed columns", {"industries"}),
+		  #"Changed column type" = Table.TransformColumnTypes(#"Removed columns", {{"industry", type text}}),
+		  #"Removed duplicates" = Table.Distinct(#"Changed column type", {"forbes_uri"})
+		in
+		    #"Removed duplicates"
+	lineageTag: d56611db-4b11-4925-97c2-6e154b04dda7
+	queryGroup: 03_Transformations
+
+	annotation PBI_ResultType = Table
+
