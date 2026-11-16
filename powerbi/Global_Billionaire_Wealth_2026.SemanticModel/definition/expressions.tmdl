@@ -1721,3 +1721,241 @@ expression tmp_RankAudit =
 	lineageTag: f614d10f-a3c2-4bef-8e54-d3d1a2b2b507
 	queryGroup: 99_Archive
 
+expression tmp_NetWorthConsistencySummary =
+		let
+		    Source =
+		        stg_BillionaireIndividual,
+		
+		    AddDifference =
+		        Table.AddColumn(
+		            Source,
+		            "Absolute_Difference_USD",
+		            each
+		                if [net_worth_usd] = null
+		                    or [net_worth_usd_m] = null
+		                then null
+		                else
+		                    Number.Abs(
+		                        [net_worth_usd]
+		                        - ([net_worth_usd_m] * 1000000)
+		                    ),
+		            type nullable number
+		        ),
+		
+		    AddStatus =
+		        Table.AddColumn(
+		            AddDifference,
+		            "Consistency_Status",
+		            each
+		                if [net_worth_usd] = null
+		                    or [net_worth_usd_m] = null then
+		                    "Missing monetary value"
+		
+		                else if [net_worth_usd] <= 0
+		                    or [net_worth_usd_m] <= 0 then
+		                    "Non-positive wealth"
+		
+		                else if Number.Round(
+		                    [Absolute_Difference_USD], 2
+		                ) <= 5000 then
+		                    "Within expected rounding tolerance"
+		
+		                else
+		                    "Investigate",
+		            type text
+		        ),
+		
+		    Summary =
+		        Table.Group(
+		            AddStatus,
+		            {"Consistency_Status"},
+		            {
+		                {
+		                    "Record_Count",
+		                    each Table.RowCount(_),
+		                    Int64.Type
+		                },
+		                {
+		                    "Max_Difference_USD",
+		                    each
+		                        let
+		                            Values =
+		                                List.RemoveNulls(
+		                                    [Absolute_Difference_USD]
+		                                )
+		                        in
+		                            if List.IsEmpty(Values)
+		                            then null
+		                            else List.Max(Values),
+		                    type nullable number
+		                }
+		            }
+		        ),
+		
+		    Sorted =
+		        Table.Sort(
+		            Summary,
+		            {{"Consistency_Status", Order.Ascending}}
+		        )
+		in
+		    Sorted
+	lineageTag: d8b4c07e-d5dd-467c-91d5-bfc2e1743c6e
+	queryGroup: 99_Archive
+
+	annotation PBI_ResultType = Table
+
+expression tmp_RankTieAudit =
+		let
+		    Source =
+		        stg_BillionaireIndividual,
+		
+		    // Group records by ranking position
+		    GroupedRanks =
+		        Table.Group(
+		            Source,
+		            {"rank"},
+		            {
+		                {
+		                    "Records_Per_Rank",
+		                    each Table.RowCount(_),
+		                    Int64.Type
+		                },
+		                {
+		                    "Distinct_NetWorth_Values",
+		                    each
+		                        List.Count(
+		                            List.Distinct(
+		                                List.RemoveNulls(
+		                                    [net_worth_usd]
+		                                )
+		                            )
+		                        ),
+		                    Int64.Type
+		                },
+		                {
+		                    "Min_NetWorth_USD",
+		                    each
+		                        let
+		                            Values =
+		                                List.RemoveNulls(
+		                                    [net_worth_usd]
+		                                )
+		                        in
+		                            if List.IsEmpty(Values)
+		                            then null
+		                            else List.Min(Values),
+		                    type nullable number
+		                },
+		                {
+		                    "Max_NetWorth_USD",
+		                    each
+		                        let
+		                            Values =
+		                                List.RemoveNulls(
+		                                    [net_worth_usd]
+		                                )
+		                        in
+		                            if List.IsEmpty(Values)
+		                            then null
+		                            else List.Max(Values),
+		                    type nullable number
+		                }
+		            }
+		        ),
+		
+		    // Keep only repeated ranks
+		    DuplicateRanks =
+		        Table.SelectRows(
+		            GroupedRanks,
+		            each [Records_Per_Rank] > 1
+		        ),
+		
+		    // Calculate wealth range within each rank
+		    AddWealthRange =
+		        Table.AddColumn(
+		            DuplicateRanks,
+		            "Wealth_Range_USD",
+		            each
+		                if [Min_NetWorth_USD] = null
+		                    or [Max_NetWorth_USD] = null
+		                then null
+		                else
+		                    [Max_NetWorth_USD]
+		                    - [Min_NetWorth_USD],
+		            type nullable number
+		        ),
+		
+		    // Assess consistency of tied ranks
+		    AddTieStatus =
+		        Table.AddColumn(
+		            AddWealthRange,
+		            "Tie_Status",
+		            each
+		                if [Distinct_NetWorth_Values] = 1 then
+		                    "Consistent tie"
+		                else
+		                    "Investigate",
+		            type text
+		        ),
+		
+		    Sorted =
+		        Table.Sort(
+		            AddTieStatus,
+		            {{"rank", Order.Ascending}}
+		        )
+		in
+		    Sorted
+	lineageTag: 4edb63b0-53eb-4db3-8265-110a616a6b25
+	queryGroup: 99_Archive
+
+	annotation PBI_ResultType = Table
+
+expression tmp_RankTieAuditSummary =
+		let
+		    Source =
+		        tmp_RankTieAudit,
+		
+		    ConsistentTies =
+		        Table.SelectRows(
+		            Source,
+		            each [Tie_Status] = "Consistent tie"
+		        ),
+		
+		    InvestigateTies =
+		        Table.SelectRows(
+		            Source,
+		            each [Tie_Status] = "Investigate"
+		        ),
+		
+		    Result =
+		        #table(
+		            type table [
+		                Metric = text,
+		                Value = number
+		            ],
+		            {
+		                {
+		                    "Duplicate rank groups",
+		                    Table.RowCount(Source)
+		                },
+		                {
+		                    "Individuals in duplicate rank groups",
+		                    List.Sum(Source[Records_Per_Rank])
+		                },
+		                {
+		                    "Consistent tie groups",
+		                    Table.RowCount(ConsistentTies)
+		                },
+		                {
+		                    "Groups requiring investigation",
+		                    Table.RowCount(InvestigateTies)
+		                }
+		            }
+		        )
+		in
+		    Result
+	lineageTag: 78365092-9a9e-402b-9e24-f376c00aa48b
+	queryGroup: 99_Archive
+
+	annotation PBI_ResultType = Table
+
