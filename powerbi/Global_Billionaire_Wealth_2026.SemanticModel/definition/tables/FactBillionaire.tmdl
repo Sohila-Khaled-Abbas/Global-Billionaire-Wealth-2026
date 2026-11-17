@@ -37,9 +37,12 @@ table FactBillionaire
 
 	column iso3
 		dataType: string
+		isHidden
 		lineageTag: 8521003f-37e7-48c8-9c54-d4d8a3a81da5
 		summarizeBy: none
 		sourceColumn: iso3
+
+		changedProperty = IsHidden
 
 		annotation SummarizationSetBy = Automatic
 
@@ -79,9 +82,12 @@ table FactBillionaire
 
 	column industry
 		dataType: string
+		isHidden
 		lineageTag: 3f200cbc-4cf9-4f0c-9289-67bc38cd0943
 		summarizeBy: none
 		sourceColumn: industry
+
+		changedProperty = IsHidden
 
 		annotation SummarizationSetBy = Automatic
 
@@ -96,18 +102,24 @@ table FactBillionaire
 
 	column forbes_uri
 		dataType: string
+		isHidden
 		lineageTag: 7eeec3ca-c438-4221-8e2d-1148566e1f3f
 		summarizeBy: none
 		sourceColumn: forbes_uri
+
+		changedProperty = IsHidden
 
 		annotation SummarizationSetBy = Automatic
 
 	column scrape_timestamp
 		dataType: dateTime
+		isHidden
 		formatString: General Date
 		lineageTag: a5cf5eb1-1224-4e3a-9d3e-009c40c06e95
 		summarizeBy: none
 		sourceColumn: scrape_timestamp
+
+		changedProperty = IsHidden
 
 		annotation SummarizationSetBy = Automatic
 

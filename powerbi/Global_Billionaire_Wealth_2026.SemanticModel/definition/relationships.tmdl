@@ -1,4 +1,8 @@
-relationship AutoDetected_1eb8a740-eaba-40e9-8d82-43fa40c3d43a
+relationship e6b83ef2-7b88-2beb-38a8-a8fa86728c83
 	fromColumn: FactBillionaire.iso3
 	toColumn: DimCountry.iso3
+
+relationship 7a569156-4479-cb23-7880-4b83f6b8fe50
+	fromColumn: FactBillionaire.industry
+	toColumn: DimIndustry.industry
 

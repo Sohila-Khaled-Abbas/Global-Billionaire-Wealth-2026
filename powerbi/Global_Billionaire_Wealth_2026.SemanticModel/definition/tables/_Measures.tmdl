@@ -1,0 +1,26 @@
+table _Measures
+	lineageTag: ec38b7b9-fed5-46c7-91d2-e613b5003b5f
+
+	measure 'Billionaire Count' =
+			
+			COUNTROWS(FactBillionaire)
+		formatString: 0
+		lineageTag: b6524b03-20fe-4298-b2cc-a8a8e91ed7b6
+
+	measure 'Total Billionaire Wealth USD' =
+			
+			SUM(FactBillionaire[net_worth_usd])
+		formatString: "AED"#,0.###############;-"AED"#,0.###############;"AED"#,0.###############
+		lineageTag: 707b177a-c543-40ec-9fb6-b5beb12fa4eb
+
+		annotation PBI_FormatHint = {"currencyCulture":"en-AE"}
+
+	partition _Measures = m
+		mode: import
+		source =
+				let
+				  Source = Table.FromRows(Json.Document(Binary.Decompress(Binary.FromText("i44FAA==", BinaryEncoding.Base64), Compression.Deflate)), let _t = ((type nullable text) meta [Serialized.Text = true]) in type table [Column1 = _t]),
+				    #"Removed Columns" = Table.RemoveColumns(Source,{"Column1"})
+				in
+				  #"Removed Columns"
+
