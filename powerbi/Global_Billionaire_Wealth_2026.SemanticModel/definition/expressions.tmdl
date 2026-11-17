@@ -4968,3 +4968,212 @@ expression tmp_GDPVintageExceptionDetail =
 	lineageTag: 90eb2400-20d7-483a-8208-d4a2e881d0ce
 	queryGroup: 99_Archive
 
+expression tmp_FinalFactGrainValidation =
+		let
+		    Individual = FactBillionaire,
+		    CountrySnapshot = FactCountrySnapshot,
+		
+		    // ================================================
+		    // 1. REUSABLE DUPLICATE COMPOSITE-KEY FUNCTION
+		    // ================================================
+		
+		    CountDuplicateKeyGroups =
+		        (SourceTable as table, KeyColumns as list) as number =>
+		            let
+		                Grouped =
+		                    Table.Group(
+		                        SourceTable,
+		                        KeyColumns,
+		                        {
+		                            {
+		                                "RecordCount",
+		                                each Table.RowCount(_),
+		                                Int64.Type
+		                            }
+		                        }
+		                    ),
+		
+		                DuplicateGroups =
+		                    Table.SelectRows(
+		                        Grouped,
+		                        each [RecordCount] > 1
+		                    )
+		            in
+		                Table.RowCount(DuplicateGroups),
+		
+		    // ================================================
+		    // 2. INDIVIDUAL FACT VALIDATION
+		    // ================================================
+		
+		    IndividualRows =
+		        Table.RowCount(Individual),
+		
+		    IndividualPersonKeys =
+		        List.RemoveNulls(Individual[forbes_uri]),
+		
+		    IndividualDistinctKeys =
+		        Table.RowCount(
+		            Table.Distinct(
+		                Table.SelectColumns(
+		                    Individual,
+		                    {"forbes_uri", "snapshot_date"}
+		                )
+		            )
+		        ),
+		
+		    IndividualDuplicateKeys =
+		        CountDuplicateKeyGroups(
+		            Individual,
+		            {"forbes_uri", "snapshot_date"}
+		        ),
+		
+		    MissingIndividualKeys =
+		        IndividualRows
+		            - List.Count(IndividualPersonKeys),
+		
+		    IndividualSnapshotDates =
+		        List.Count(
+		            List.Distinct(
+		                List.RemoveNulls(
+		                    Individual[snapshot_date]
+		                )
+		            )
+		        ),
+		
+		    // ================================================
+		    // 3. COUNTRY SNAPSHOT FACT VALIDATION
+		    // ================================================
+		
+		    CountryRows =
+		        Table.RowCount(CountrySnapshot),
+		
+		    CountryISO3 =
+		        List.RemoveNulls(CountrySnapshot[iso3]),
+		
+		    CountryDistinctCompositeKeys =
+		        Table.RowCount(
+		            Table.Distinct(
+		                Table.SelectColumns(
+		                    CountrySnapshot,
+		                    {"iso3", "snapshot_date"}
+		                )
+		            )
+		        ),
+		
+		    CountryDuplicateKeys =
+		        CountDuplicateKeyGroups(
+		            CountrySnapshot,
+		            {"iso3", "snapshot_date"}
+		        ),
+		
+		    MissingCountryKeys =
+		        CountryRows - List.Count(CountryISO3),
+		
+		    CountrySnapshotDates =
+		        List.Count(
+		            List.Distinct(
+		                List.RemoveNulls(
+		                    CountrySnapshot[snapshot_date]
+		                )
+		            )
+		        ),
+		
+		    // ================================================
+		    // 4. BUILD QA SCORECARD
+		    // ================================================
+		
+		    Result =
+		        #table(
+		            type table [
+		                Check = text,
+		                Actual = number,
+		                Expected = number,
+		                Status = text
+		            ],
+		            {
+		                {
+		                    "Individual fact rows",
+		                    IndividualRows,
+		                    3384,
+		                    if IndividualRows = 3384
+		                    then "Passed" else "Investigate"
+		                },
+		
+		                {
+		                    "Distinct individual composite keys",
+		                    IndividualDistinctKeys,
+		                    3384,
+		                    if IndividualDistinctKeys = 3384
+		                    then "Passed" else "Investigate"
+		                },
+		
+		                {
+		                    "Duplicate individual composite-key groups",
+		                    IndividualDuplicateKeys,
+		                    0,
+		                    if IndividualDuplicateKeys = 0
+		                    then "Passed" else "Investigate"
+		                },
+		
+		                {
+		                    "Missing individual person keys",
+		                    MissingIndividualKeys,
+		                    0,
+		                    if MissingIndividualKeys = 0
+		                    then "Passed" else "Investigate"
+		                },
+		
+		                {
+		                    "Individual snapshot-date count",
+		                    IndividualSnapshotDates,
+		                    1,
+		                    if IndividualSnapshotDates = 1
+		                    then "Passed" else "Investigate"
+		                },
+		
+		                {
+		                    "Country snapshot fact rows",
+		                    CountryRows,
+		                    80,
+		                    if CountryRows = 80
+		                    then "Passed" else "Investigate"
+		                },
+		
+		                {
+		                    "Distinct country-date composite keys",
+		                    CountryDistinctCompositeKeys,
+		                    80,
+		                    if CountryDistinctCompositeKeys = 80
+		                    then "Passed" else "Investigate"
+		                },
+		
+		                {
+		                    "Duplicate country-date key groups",
+		                    CountryDuplicateKeys,
+		                    0,
+		                    if CountryDuplicateKeys = 0
+		                    then "Passed" else "Investigate"
+		                },
+		
+		                {
+		                    "Missing country keys",
+		                    MissingCountryKeys,
+		                    0,
+		                    if MissingCountryKeys = 0
+		                    then "Passed" else "Investigate"
+		                },
+		
+		                {
+		                    "Country snapshot-date count",
+		                    CountrySnapshotDates,
+		                    1,
+		                    if CountrySnapshotDates = 1
+		                    then "Passed" else "Investigate"
+		                }
+		            }
+		        )
+		in
+		    Result
+	lineageTag: ff111ad1-e7a7-43c2-89b8-de299df506ca
+	queryGroup: 99_Archive
+
