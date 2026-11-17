@@ -4057,3 +4057,285 @@ expression tmp_FactCountrySnapshotValidation =
 	lineageTag: 2eaffd0d-2848-4f5a-a6b7-6db54911a890
 	queryGroup: 99_Archive
 
+expression tmp_GalaxyFactReconciliation =
+		let
+		    // Country-level snapshot fact
+		    Snapshot =
+		        Table.SelectColumns(
+		            FactCountrySnapshot,
+		            {
+		                "iso3",
+		                "country_wealth_rank",
+		                "billionaire_count",
+		                "total_wealth_usd"
+		            }
+		        ),
+		
+		    // Recalculate country totals from individual billionaire records
+		    IndividualByCountry =
+		        Table.Group(
+		            FactBillionaire,
+		            {"iso3"},
+		            {
+		                {
+		                    "Individual_Billionaire_Count",
+		                    each Table.RowCount(_),
+		                    Int64.Type
+		                },
+		                {
+		                    "Individual_Total_Wealth_USD",
+		                    each List.Sum(List.RemoveNulls([net_worth_usd])),
+		                    type number
+		                }
+		            }
+		        ),
+		
+		    // Full outer join also exposes countries present in only one fact
+		    Merged =
+		        Table.NestedJoin(
+		            Snapshot,
+		            {"iso3"},
+		            IndividualByCountry,
+		            {"iso3"},
+		            "IndividualAggregate",
+		            JoinKind.FullOuter
+		        ),
+		
+		    Expanded =
+		        Table.ExpandTableColumn(
+		            Merged,
+		            "IndividualAggregate",
+		            {
+		                "iso3",
+		                "Individual_Billionaire_Count",
+		                "Individual_Total_Wealth_USD"
+		            },
+		            {
+		                "Individual_ISO3",
+		                "Individual_Billionaire_Count",
+		                "Individual_Total_Wealth_USD"
+		            }
+		        ),
+		
+		    AddReconciliationISO3 =
+		        Table.AddColumn(
+		            Expanded,
+		            "Reconciliation_ISO3",
+		            each
+		                if [iso3] <> null
+		                then [iso3]
+		                else [Individual_ISO3],
+		            type nullable text
+		        ),
+		
+		    AddCountDifference =
+		        Table.AddColumn(
+		            AddReconciliationISO3,
+		            "Billionaire_Count_Difference",
+		            each
+		                if [billionaire_count] = null
+		                    or [Individual_Billionaire_Count] = null
+		                then null
+		                else [billionaire_count]
+		                    - [Individual_Billionaire_Count],
+		            Int64.Type
+		        ),
+		
+		    AddWealthDifference =
+		        Table.AddColumn(
+		            AddCountDifference,
+		            "Wealth_Difference_USD",
+		            each
+		                if [total_wealth_usd] = null
+		                    or [Individual_Total_Wealth_USD] = null
+		                then null
+		                else Number.Round(
+		                    [total_wealth_usd]
+		                        - [Individual_Total_Wealth_USD],
+		                    2
+		                ),
+		            type number
+		        ),
+		
+		    AddStatus =
+		        Table.AddColumn(
+		            AddWealthDifference,
+		            "Reconciliation_Status",
+		            each
+		                if [billionaire_count] = null
+		                    or [Individual_Billionaire_Count] = null
+		                then "Missing from one fact"
+		                else if [Billionaire_Count_Difference] <> 0
+		                    or [Wealth_Difference_USD] <> 0
+		                then "Investigate"
+		                else "Passed",
+		            type text
+		        ),
+		
+		    SelectedColumns =
+		        Table.SelectColumns(
+		            AddStatus,
+		            {
+		                "Reconciliation_ISO3",
+		                "country_wealth_rank",
+		                "billionaire_count",
+		                "Individual_Billionaire_Count",
+		                "Billionaire_Count_Difference",
+		                "total_wealth_usd",
+		                "Individual_Total_Wealth_USD",
+		                "Wealth_Difference_USD",
+		                "Reconciliation_Status"
+		            }
+		        ),
+		
+		    SortedRows =
+		        Table.Sort(
+		            SelectedColumns,
+		            {{"country_wealth_rank", Order.Ascending}}
+		        )
+		in
+		    SortedRows
+	lineageTag: d32c03eb-10b7-439d-afa3-abd1cbffd194
+	queryGroup: 99_Archive
+
+expression tmp_GalaxyFactReconciliationSummary =
+		let
+		    Source = tmp_GalaxyFactReconciliation,
+		
+		    PassedCountries =
+		        Table.RowCount(
+		            Table.SelectRows(
+		                Source,
+		                each [Reconciliation_Status] = "Passed"
+		            )
+		        ),
+		
+		    MissingCountries =
+		        Table.RowCount(
+		            Table.SelectRows(
+		                Source,
+		                each [Reconciliation_Status] = "Missing from one fact"
+		            )
+		        ),
+		
+		    CountMismatches =
+		        Table.RowCount(
+		            Table.SelectRows(
+		                Source,
+		                each
+		                    [Billionaire_Count_Difference] <> null
+		                    and [Billionaire_Count_Difference] <> 0
+		            )
+		        ),
+		
+		    WealthMismatches =
+		        Table.RowCount(
+		            Table.SelectRows(
+		                Source,
+		                each
+		                    [Wealth_Difference_USD] <> null
+		                    and [Wealth_Difference_USD] <> 0
+		            )
+		        ),
+		
+		    TotalSnapshotBillionaires =
+		        List.Sum(FactCountrySnapshot[billionaire_count]),
+		
+		    TotalIndividualRecords =
+		        Table.RowCount(FactBillionaire),
+		
+		    TotalSnapshotWealth =
+		        List.Sum(FactCountrySnapshot[total_wealth_usd]),
+		
+		    TotalIndividualWealth =
+		        List.Sum(FactBillionaire[net_worth_usd]),
+		
+		    GlobalWealthDifference =
+		        Number.Round(
+		            TotalSnapshotWealth - TotalIndividualWealth,
+		            2
+		        ),
+		
+		    ReconciliationRows =
+		        Table.RowCount(Source),
+		
+		    Result =
+		        #table(
+		            type table [
+		                Check = text,
+		                Actual = number,
+		                Expected = number,
+		                Status = text
+		            ],
+		            {
+		                {
+		                    "Reconciliation rows",
+		                    ReconciliationRows,
+		                    80,
+		                    if ReconciliationRows = 80
+		                    then "Passed"
+		                    else "Investigate"
+		                },
+		                {
+		                    "Countries reconciled",
+		                    PassedCountries,
+		                    80,
+		                    if PassedCountries = 80
+		                    then "Passed"
+		                    else "Investigate"
+		                },
+		                {
+		                    "Countries missing from either fact",
+		                    MissingCountries,
+		                    0,
+		                    if MissingCountries = 0
+		                    then "Passed"
+		                    else "Investigate"
+		                },
+		                {
+		                    "Country billionaire-count mismatches",
+		                    CountMismatches,
+		                    0,
+		                    if CountMismatches = 0
+		                    then "Passed"
+		                    else "Investigate"
+		                },
+		                {
+		                    "Country total-wealth mismatches",
+		                    WealthMismatches,
+		                    0,
+		                    if WealthMismatches = 0
+		                    then "Passed"
+		                    else "Investigate"
+		                },
+		                {
+		                    "Snapshot billionaire total",
+		                    TotalSnapshotBillionaires,
+		                    3384,
+		                    if TotalSnapshotBillionaires = 3384
+		                    then "Passed"
+		                    else "Investigate"
+		                },
+		                {
+		                    "Individual fact rows",
+		                    TotalIndividualRecords,
+		                    3384,
+		                    if TotalIndividualRecords = 3384
+		                    then "Passed"
+		                    else "Investigate"
+		                },
+		                {
+		                    "Global wealth difference (USD)",
+		                    GlobalWealthDifference,
+		                    0,
+		                    if GlobalWealthDifference = 0
+		                    then "Passed"
+		                    else "Investigate"
+		                }
+		            }
+		        )
+		in
+		    Result
+	lineageTag: 29ce192b-d4bf-44d7-b641-c4f9f17086c9
+	queryGroup: 99_Archive
+

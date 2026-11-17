@@ -1,87 +1,137 @@
 # Data Dictionary: Global Billionaire Wealth to GDP (2026)
 
-This document provides complete field-level definitions, data types, validation constraints, and analytical notes for both tables in the semantic model.
+This document provides complete field-level definitions, data types, primary/foreign keys, validation constraints, and business rules for the Power BI Semantic Model and data pipeline.
 
 ---
 
-## 1. Individual Billionaires Table (`billionaire_individual_2026`)
+## 🏛️ Semantic Model Architecture Overview
 
-- **Primary Grain**: One record per billionaire individual / family entity.
+The analytical model implements a Kimball-style dimensional architecture (Star/Snowflake schema) engineered in Power BI Desktop Developer Mode (`.pbip` / TMDL):
+
+```
+                     ┌──────────────────┐
+                     │    DimCountry    │
+                     │  (80 Countries)  │
+                     └────────┬─────────┘
+                              │
+                    1 : *     │     1 : 1 (Both)
+            ┌─────────────────┴─────────────────┐
+            ▼                                   ▼
+   ┌─────────────────┐                ┌───────────────────┐
+   │ FactBillionaire │                │FactCountrySnapshot│
+   │ (3,384 Records) │                │   (80 Records)    │
+   └────────▲────────┘                └───────────────────┘
+            │
+            │ * : 1
+   ┌────────┴────────┐
+   │   DimIndustry   │
+   │ (18 Industries) │
+   └─────────────────┘
+```
+
+---
+
+## 1. Dimension Tables
+
+### A. `DimCountry` (Country Dimension)
+- **Primary Grain**: One row per sovereign nation or economic territory.
+- **Record Count**: 80 records.
+- **Primary Key**: `iso3`
+
+| Column Name | Storage Type | Power BI Type | Nullable | Description & Business Rules |
+| :--- | :--- | :--- | :---: | :--- |
+| `iso3` | String (3 chars) | Text | No (PK) | Standard ISO 3166-1 alpha-3 uppercase country identifier. Joins to `FactBillionaire.iso3` and `FactCountrySnapshot.iso3`. |
+| `country` | String | Text | No | Standardized common country name (e.g., `United States`, `China`, `Germany`). |
+| `wb_country_name` | String | Text | No | Official nation name aligned with World Bank national accounts nomenclature. |
+
+---
+
+### B. `DimIndustry` (Industry Dimension)
+- **Primary Grain**: One row per standardized economic sector.
+- **Record Count**: 18 industries.
+- **Primary Key**: `industry`
+
+| Column Name | Storage Type | Power BI Type | Nullable | Description & Business Rules |
+| :--- | :--- | :--- | :---: | :--- |
+| `industry` | String | Text | No (PK) | Standardized primary industrial sector (e.g., `Technology`, `Finance & Investments`, `Fashion & Retail`). Joins to `FactBillionaire.industry`. |
+
+---
+
+## 2. Fact Tables
+
+### A. `FactBillionaire` (Billionaire Fact)
+- **Primary Grain**: One row per billionaire individual or family entity.
 - **Record Count**: 3,384 records.
-- **Source**: Forbes Real-Time Billionaires List (Scraped: April 10, 2026) combined with World Bank GDP & Population Indicators.
+- **Foreign Keys**: `iso3` (to `DimCountry`), `industry` (to `DimIndustry`).
 
-| Column Name | Data Type | Nullable | Example Value | Description & Business Rules |
-| :--- | :--- | :---: | :--- | :--- |
-| `rank` | Integer | No | `1` | Global billionaire rank ordered by total net worth descending. |
-| `person_name` | String | No | `Elon Musk` | Full legal or recognized name of the billionaire or family unit. |
-| `gender` | String | No | `M` | Gender classification (`M` for Male, `F` for Female). |
-| `age` | Float | Yes (48 nulls) | `54.0` | Age of individual in years as of the 2026 assessment. |
-| `country` | String | No | `United States` | Primary country of citizenship or primary economic residence. |
-| `iso3` | String | No | `USA` | Standard ISO 3166-1 alpha-3 country code. |
-| `wb_country_name` | String | No | `United States` | Official country name standardized according to World Bank nomenclature. |
-| `state` | String | Yes (1,842 nulls)| `Texas` | Administrative state/province (primarily populated for US billionaires). |
-| `city` | String | Yes (49 nulls) | `Austin` | City of primary residence or family office base. |
-| `net_worth_usd_m` | Float | No | `800629.06` | Total estimated net worth in millions of US Dollars (USD M). |
-| `net_worth_usd` | Float | No | `800629059000.0` | Total estimated net worth in absolute US Dollars (USD). |
-| `source_of_wealth` | String | No | `Tesla, SpaceX` | Primary commercial venture, firm, or asset source generating the wealth. |
-| `industries` | String | No | `Technology` | Industry sector categorization listed in the Forbes source. |
-| `primary_industry` | String | No | `Technology` | Standardized primary industrial sector used for comparative analytics. |
-| `self_made` | Boolean | No | `True` | Flag indicating whether wealth was self-generated (`True`) or inherited (`False`). |
-| `wealth_gdp_ratio_pct` | Float | Yes (4 nulls) | `2.7847` | Individual net worth expressed as a percentage of the country's annual nominal GDP. |
-| `wealth_per_citizen_usd`| Float | Yes (4 nulls) | `2354.02` | Hypothetical wealth distribution per citizen if distributed equally across the population. |
-| `wealth_country_share_pct`| Float | No | `9.5966` | Percentage of the country's total billionaire wealth held by this single individual. |
-| `sector_dominance_score`| Float | No | `23.35` | Percentage of total country billionaire wealth concentrated in this individual's sector. |
-| `gdp_usd` | Float | No | `28750956130731.2` | Nominal GDP of the billionaire's country in US Dollars (World Bank 2023/2024). |
-| `population` | Float | No | `340110988.0` | Total national population of the country (World Bank 2023/2024). |
-| `gdp_year` | Float | No | `2024.0` | Reference baseline calendar year for the macroeconomic GDP figure. |
-| `forbes_uri` | String | No | `elon-musk` | Unique identifier slug for the Forbes profile page. |
-| `scrape_timestamp` | String | No | `2026-04-10 21:32 UTC` | UTC timestamp of data retrieval and calculation. |
-| `birth_year` | Float | Yes (48 nulls) | `1971.0` | Inferred year of birth (`2026 - age`). |
+| Column Name | Storage Type | Power BI Type | Nullable | Description & Business Rules |
+| :--- | :--- | :--- | :---: | :--- |
+| `rank` | Int64 | Whole Number | No | Global wealth rank (1 = richest individual, Elon Musk). |
+| `person_name` | String | Text | No | Full legal or publicly recognized name of the billionaire or family group. |
+| `gender` | String (1 char) | Text | No | Gender code: `M` (Male, 2,910 records), `F` (Female, 474 records). |
+| `age` | Int64 | Whole Number | Yes (48 nulls) | Current age in years. Blank for private individuals with undisclosed birthdates. |
+| `birth_year` | Int64 | Whole Number | Yes (48 nulls) | Inferred year of birth (`2026 - age`). |
+| `iso3` | String (Hidden) | Text | No (FK) | Foreign key joining to `DimCountry.iso3`. |
+| `state` | String | Text | Yes (1,842 nulls) | Administrative state or province (predominantly US and Canadian entries). |
+| `city` | String | Text | Yes (49 nulls) | City of primary residence or operational headquarters. |
+| `net_worth_usd` | Decimal (Fixed) | Currency | No | Total estimated net worth in absolute US Dollars (USD). |
+| `source_of_wealth` | String | Text | No | Primary business, company, or venture originating the fortune (e.g., `Tesla, SpaceX`, `Google`). |
+| `industry` | String (Hidden) | Text | No (FK) | Foreign key joining to `DimIndustry.industry`. |
+| `self_made` | Boolean | True/False | No | Entrepreneurial classification: `TRUE` = self-made founder/creator; `FALSE` = inherited/dynastic. |
+| `snapshot_date` | DateTime (Date) | Date | No | Reference date of the snapshot (`p_SnapshotDate`). |
+| `forbes_uri` | String (Hidden) | Text | No | Unique slug identifier for the billionaire's Forbes profile page. |
+| `scrape_timestamp` | DateTimeZone (Hidden) | Date/Time/Zone | No | Exact UTC timestamp of data retrieval (`2026-04-10 21:32 UTC`). |
 
 ---
 
-## 2. Country Aggregate Table (`billionaire_country_aggregate_2026`)
+### B. `FactCountrySnapshot` (Country Macroeconomic Snapshot)
+- **Primary Grain**: One row per sovereign nation/territory.
+- **Record Count**: 80 records.
+- **Key**: `iso3` (1-to-1 bidirectional relationship with `DimCountry.iso3`).
 
-- **Primary Grain**: One record per sovereign state or economic territory.
-- **Record Count**: 80 countries.
-- **Relationship**: 1-to-many relationship with `billionaire_individual_2026` via the `country` key.
-
-| Column Name | Data Type | Nullable | Example Value | Description & Business Rules |
-| :--- | :--- | :---: | :--- | :--- |
-| `country_wealth_rank` | Integer | No | `1` | Global rank of nation ordered by total national billionaire wealth descending. |
-| `country` | String | No | `United States` | Primary common country name. |
-| `iso3` | String | No | `USA` | Standard ISO 3166-1 alpha-3 country identifier. |
-| `wb_country_name` | String | No | `United States` | Standard World Bank nation name. |
-| `billionaire_count` | Integer | No | `978` | Total number of billionaires identified in the country. |
-| `total_wealth_usd_m` | Float | No | `8342857.33` | Aggregate wealth of all billionaires in the country (USD Millions). |
-| `total_wealth_usd` | Float | No | `8342857350000.0` | Aggregate wealth of all billionaires in the country (absolute USD). |
-| `mean_wealth_usd_m` | Float | No | `8530.53` | Arithmetic mean net worth per billionaire in the country (USD Millions). |
-| `median_wealth_usd_m` | Float | No | `3075.92` | Median net worth per billionaire in the country (USD Millions). |
-| `max_wealth_usd_m` | Float | No | `800629.06` | Net worth of the single richest individual in the country (USD Millions). |
-| `top_billionaire` | String | No | `Elon Musk` | Name of the wealthiest individual in the country. |
-| `dominant_industry_by_wealth` | String | No | `Technology` | Industry accounting for the highest cumulative wealth in the country. |
-| `self_made_count` | Integer | No | `706` | Count of billionaires in the country classified as self-made. |
-| `self_made_ratio_pct` | Float | No | `72.2` | Proportion of self-made billionaires in the country (`self_made_count / billionaire_count * 100`). |
-| `mean_age` | Float | No | `66.6` | Average age of billionaires in the country. |
-| `country_wealth_gdp_pct` | Float | No | `29.02` | Cumulative billionaire wealth as a percentage of nominal national GDP. |
-| `billionaires_per_million_pop`| Float | No | `2.8755` | Billionaires per million residents (`billionaire_count / (population / 1,000,000)`). |
-| `wealth_concentration_tier` | String | No | `Very High (20–40%)` | Qualitative macro tier categorizing billionaire wealth relative to national GDP. |
-| `gdp_per_billionaire_bn` | Float | No | `29.40` | National GDP divided by billionaire count (USD Billions of economic output per billionaire). |
-| `sector_dominance_score` | Float | No | `23.35` | Percentage of national billionaire wealth held in the leading industry sector. |
-| `gdp_usd` | Float | No | `28750956130731.2` | Annual nominal GDP in US Dollars from World Bank. |
-| `population` | Float | No | `340110988.0` | National population from World Bank. |
-| `gdp_year` | Float | No | `2024.0` | Calendar year of reference GDP figure. |
+| Column Name | Storage Type | Power BI Type | Nullable | Description & Business Rules |
+| :--- | :--- | :--- | :---: | :--- |
+| `iso3` | String | Text | No (FK/PK) | Standard ISO 3166-1 alpha-3 country identifier. |
+| `country_wealth_rank` | Int64 | Whole Number | No | Sovereign rank ordered by cumulative billionaire wealth descending (1 = USA). |
+| `billionaire_count` | Int64 | Whole Number | No | Total resident billionaire headcount in the country. |
+| `total_wealth_usd_m` | Decimal | Currency | No | Cumulative billionaire net worth in Millions of US Dollars ($M). |
+| `total_wealth_usd` | Decimal | Currency | No | Cumulative billionaire net worth in absolute US Dollars (USD). |
+| `mean_wealth_usd_m` | Double | Decimal Number | No | Arithmetic average wealth per billionaire ($M). |
+| `median_wealth_usd_m` | Double | Decimal Number | No | Median wealth per billionaire ($M). |
+| `max_wealth_usd_m` | Double | Decimal Number | No | Net worth of the single wealthiest individual in the country ($M). |
+| `top_billionaire` | String | Text | No | Name of the nation's wealthiest citizen. |
+| `dominant_industry_by_wealth` | String | Text | No | Sector contributing the highest aggregate wealth in the country. |
+| `self_made_count` | Int64 | Whole Number | No | Headcount of self-made billionaires in the country. |
+| `self_made_ratio_pct` | Double | Decimal Number | No | Percentage of resident billionaires who are self-made (`self_made_count / billionaire_count * 100`). |
+| `mean_age` | Double | Decimal Number | No | Average age of resident billionaires. |
+| `country_wealth_gdp_pct` | Double | Decimal Number | No | Total billionaire wealth expressed as a percentage of nominal national GDP. |
+| `billionaires_per_million_pop` | Double | Decimal Number | No | Billionaire density per million residents (`billionaire_count / (population / 1,000,000)`). |
+| `wealth_concentration_tier` | String | Text | No | Macroeconomic tier: `Extreme (≥40%)`, `Very High (20–40%)`, `High (10–20%)`, `Moderate (3–10%)`, `Low (<3%)`. |
+| `gdp_per_billionaire_bn` | Double | Decimal Number | No | National economic output per billionaire (GDP / billionaire_count in $B USD). |
+| `sector_dominance_score` | Double | Decimal Number | No | Share of national billionaire wealth held in the single leading sector (%). |
+| `gdp_usd` | Decimal | Currency | No | Annual nominal GDP in US Dollars from World Bank. |
+| `population` | Int64 | Whole Number | No | Total national population from World Bank. |
+| `gdp_year` | Int64 | Whole Number | No | Baseline year of national GDP indicator (2023 or 2024). |
+| `snapshot_date` | DateTime (Date) | Date | No | Analytical snapshot date (`p_SnapshotDate`). |
 
 ---
 
-## 3. Wealth Concentration Tier Reference
+## 3. Dedicated Measures Table (`_Measures`)
 
-The variable `wealth_concentration_tier` classifies nations into five economic concentration regimes:
+All analytical DAX metrics are centralized in the `_Measures` table:
 
-| Concentration Tier | Benchmark Range (% of GDP) | Country Count | Representative Examples |
-| :--- | :---: | :---: | :--- |
-| **Extreme** | $\ge 40\%$ | 9 | Hong Kong (103.9%), Cyprus (148.7%), St. Kitts & Nevis (860.7%), Israel (42.4%) |
-| **Very High** | $20\% \text{ to } <40\%$ | 12 | United States (29.0%), Russia (30.1%), India (25.3%), Germany (21.0%) |
-| **High** | $10\% \text{ to } <20\%$ | 21 | China (11.4%), France (18.7%), Canada (19.8%), Italy (19.5%), Brazil (12.1%) |
-| **Moderate** | $3\% \text{ to } <10\%$ | 29 | United Kingdom (7.3%), Japan (5.4%), South Korea (8.7%), Turkey (8.4%) |
-| **Low** | $< 3\%$ | 9 | Netherlands (2.9%), Saudi Arabia (2.1%), Poland (1.6%), South Africa (1.9%) |
+| Measure Name | DAX Expression | Formatting | Description |
+| :--- | :--- | :--- | :--- |
+| `Billionaire Count` | `COUNTROWS(FactBillionaire)` | Whole Number (`#,##0`) | Dynamic count of billionaires based on active filter context. |
+| `Total Billionaire Wealth USD` | `SUM(FactBillionaire[net_worth_usd])` | Currency (`$#,##0`) | Aggregate net worth across the filtered population in absolute USD. |
+
+---
+
+## 4. Power Query Parameters & Intermediate Tables
+
+- **`p_DataFolderPath`**: Configurable root path for raw CSV files (`data\raw`).
+- **`p_SnapshotDate`**: Parameterized date anchor for time-series modeling.
+- **`fn_StandardizeCountry`**: Custom M function standardizing text whitespace and capitalization.
+- **`fn_ParseIndustries`**: Custom M function splitting delimited industry strings.
+- **`int_BillionaireIndustryBridge`**: Normalized bridge table connecting each billionaire to one or more industries (`person_name`, `industry`, `rank`).
+- **`int_IndustryLookup`**: Distinct deduped industry catalog feeding `DimIndustry`.

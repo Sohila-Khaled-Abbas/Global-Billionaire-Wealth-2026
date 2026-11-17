@@ -16,7 +16,7 @@ def run_validations():
 
     base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
     
-    # Paths
+    # Paths to verify
     ind_csv = os.path.join(base_dir, "data", "raw", "billionaire_individual_2026.csv")
     agg_csv = os.path.join(base_dir, "data", "raw", "billionaire_country_aggregate_2026.csv")
     pbip_file = os.path.join(base_dir, "powerbi", "Global_Billionaire_Wealth_2026.pbip")
@@ -26,6 +26,14 @@ def run_validations():
     model_tmdl = os.path.join(base_dir, "powerbi", "Global_Billionaire_Wealth_2026.SemanticModel", "definition", "model.tmdl")
     database_tmdl = os.path.join(base_dir, "powerbi", "Global_Billionaire_Wealth_2026.SemanticModel", "definition", "database.tmdl")
     expressions_tmdl = os.path.join(base_dir, "powerbi", "Global_Billionaire_Wealth_2026.SemanticModel", "definition", "expressions.tmdl")
+    rel_tmdl = os.path.join(base_dir, "powerbi", "Global_Billionaire_Wealth_2026.SemanticModel", "definition", "relationships.tmdl")
+    
+    # Dimensional Model TMDL Tables
+    dim_country = os.path.join(base_dir, "powerbi", "Global_Billionaire_Wealth_2026.SemanticModel", "definition", "tables", "DimCountry.tmdl")
+    dim_industry = os.path.join(base_dir, "powerbi", "Global_Billionaire_Wealth_2026.SemanticModel", "definition", "tables", "DimIndustry.tmdl")
+    fact_billionaire = os.path.join(base_dir, "powerbi", "Global_Billionaire_Wealth_2026.SemanticModel", "definition", "tables", "FactBillionaire.tmdl")
+    fact_country = os.path.join(base_dir, "powerbi", "Global_Billionaire_Wealth_2026.SemanticModel", "definition", "tables", "FactCountrySnapshot.tmdl")
+    measures_table = os.path.join(base_dir, "powerbi", "Global_Billionaire_Wealth_2026.SemanticModel", "definition", "tables", "_Measures.tmdl")
 
     errors = []
     checks = []
@@ -33,7 +41,8 @@ def run_validations():
     # 1. File existence checks
     critical_files = [
         ind_csv, agg_csv, pbip_file, pbir_file, pbism_file, 
-        report_json, model_tmdl, database_tmdl, expressions_tmdl
+        report_json, model_tmdl, database_tmdl, expressions_tmdl,
+        rel_tmdl, dim_country, dim_industry, fact_billionaire, fact_country, measures_table
     ]
     for filepath in critical_files:
         rel_path = os.path.relpath(filepath, base_dir)
@@ -118,7 +127,7 @@ def run_validations():
     print("\n--- Validation Results Summary ---")
     for name, status, detail in checks:
         icon = "✅" if status == "PASS" else "❌"
-        print(f"{icon} {name:<42} [{status}] {detail}")
+        print(f"{icon} {name:<50} [{status}] {detail}")
 
     # Output to GitHub Step Summary if running in GitHub Actions
     summary_path = os.environ.get("GITHUB_STEP_SUMMARY")

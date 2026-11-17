@@ -1,6 +1,6 @@
 # Methodology and Analytical Limitations
 
-This document outlines the methodological framework, mathematical formulations, data source provenance, and intrinsic limitations of the 2026 Global Billionaire Wealth to GDP analysis.
+This document outlines the methodological framework, mathematical formulations, data source provenance, dimensional transformation mechanics, and intrinsic limitations of the 2026 Global Billionaire Wealth to GDP analysis.
 
 ---
 
@@ -16,27 +16,42 @@ The analytics platform merges two independent authoritative tiers of financial a
 2. **Macroeconomic Tier**:
    - **Source**: World Bank Open Data Repository (Indicators: `NY.GDP.MKTP.CD` for Nominal GDP in current USD, `SP.POP.TOTL` for Total Population).
    - **Temporal Window**: Baseline years 2023–2024 (most recent verified standardized national accounts).
-   - **Standardization**: Country names reconciled against ISO 3166-1 alpha-3 codes.
+   - **Standardization**: Country names reconciled against ISO 3166-1 alpha-3 codes (`DimCountry.iso3`).
 
 ---
 
-## 2. Mathematical Formulations & Indicator Definitions
+## 2. Dimensional Data Modeling Methodology
+
+To transition from raw flat CSV records into an enterprise-ready analytical model, the solution employs a dimensional architecture:
+
+1. **Dimensional Isolation**:
+   - Standardized `DimCountry` isolates country-level surrogate and natural keys (`iso3`, `country`, `wb_country_name`).
+   - `DimIndustry` isolates the 18 distinct primary industries parsed from comma-delimited strings via `fn_ParseIndustries`.
+2. **Grain Separation**:
+   - `FactBillionaire` models the micro-level grain (individual wealth, age, gender, state, city, self-made status).
+   - `FactCountrySnapshot` models the macro-level grain (national GDP, population, wealth tiers, sector dominance scores).
+3. **Automated Quality Gate**:
+   - 17 automated QA queries in query group `05_QA & Reconciliation` audit referential integrity, duplicate ranks, and balance-sheet consistency during data refresh.
+
+---
+
+## 3. Mathematical Formulations & Indicator Definitions
 
 ### A. Wealth-to-GDP Concentration Ratio
-$$\text{Wealth-to-GDP \%} = \left( \frac{\sum \text{Billionaire Net Worth (USD)}}{\text{Nominal Annual GDP (USD)}} \right) \times 100$$
+$$\text{Wealth-to-GDP \%} = \left( \frac{\sum \text{FactCountrySnapshot}[total\_wealth\_usd]}{\text{FactCountrySnapshot}[gdp\_usd]} \right) \times 100$$
 *Note*: This metric does **not** signify that billionaires own a fraction of annual GDP (which is a flow of production over 365 days); rather, it expresses total accumulated capital stock against annual output as a standardized proxy of wealth concentration.
 
 ### B. Hypothetical Wealth Distribution per Citizen
-$$\text{Wealth per Citizen (USD)} = \frac{\sum \text{Billionaire Net Worth (USD)}}{\text{Total National Population}}$$
+$$\text{Wealth per Citizen (USD)} = \frac{\sum \text{FactCountrySnapshot}[total\_wealth\_usd]}{\text{FactCountrySnapshot}[population]}$$
 *Note*: Represents the lump-sum per capita dividend if total billionaire assets were liquidated and uniformly distributed among all national citizens.
 
 ### C. Self-Made Proportion
-$$\text{Self-Made Ratio \%} = \left( \frac{\text{Count of Self-Made Billionaires}}{\text{Total National Billionaires}} \right) \times 100$$
-*Note*: Classification follows Forbes criteria: individuals who founded their enterprise or rose through executive ranks are coded as `True`, whereas individuals inheriting generational family enterprises or trusts are coded as `False`.
+$$\text{Self-Made Ratio \%} = \left( \frac{\text{Count of Self-Made Billionaires}}{\text{Total Billionaires}} \right) \times 100$$
+*Note*: Follows Forbes methodology: founders, corporate builders, and technology innovators are classified as `TRUE`, while heirs of multi-generational family enterprises are classified as `FALSE`.
 
 ---
 
-## 3. Methodological Limitations
+## 4. Methodological Limitations
 
 1. **Stock vs. Flow Mismatch**:
    - Wealth is a balance-sheet **stock** metric accumulated across decades or generations.

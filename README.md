@@ -12,7 +12,7 @@
     <img src="https://img.shields.io/badge/Semantic%20Model-TMDL%20Tabular-0078D4?style=for-the-badge&logo=microsoft&logoColor=white" alt="TMDL Semantic Model" />
   </a>
   <a href="docs/business_questions.md">
-    <img src="https://img.shields.io/badge/DAX-Advanced%20Analytics-005A9E?style=for-the-badge&logo=analogue&logoColor=white" alt="DAX Analytics" />
+    <img src="https://img.shields.io/badge/DAX-Dimensional%20Analytics-005A9E?style=for-the-badge&logo=analogue&logoColor=white" alt="DAX Analytics" />
   </a>
   <a href=".github/workflows/ci.yml">
     <img src="https://img.shields.io/badge/CI-Automated%20Audit%20Passing-10B981?style=for-the-badge&logo=githubactions&logoColor=white" alt="CI Status" />
@@ -26,7 +26,7 @@
 </p>
 
 <p align="center">
-  <b>A modern business intelligence and macro-financial model dissecting $19.64 Trillion in private capital across 3,384 fortunes and 80 sovereign economies.</b>
+  <b>An enterprise-grade Power BI dimensional model (PBIP / TMDL) evaluating $19.64 Trillion in private wealth across 3,384 fortunes and 80 sovereign economies.</b>
 </p>
 
 </div>
@@ -59,14 +59,14 @@ Global Capital Distribution by Top 5 Economic Powers
 ## 🧭 Navigation
 
 - [Executive Summary](#-executive-summary)
-- [System Architecture & Data Flow](#-system-architecture--data-flow)
-- [Relational Data Model (ERD)](#-relational-data-model-erd)
-- [Macro Concentration Landscape](#-macro-concentration-landscape)
-- [Capital Origin Dynamics](#-capital-origin-dynamics)
+- [Dimensional Semantic Model & Schema](#-dimensional-semantic-model--schema)
+- [Data Pipeline & Normalization Architecture](#-data-pipeline--normalization-architecture)
+- [Power Query Engineering & QA Audit Framework](#-power-query-engineering--qa-audit-framework)
+- [Macroeconomic Concentration Framework](#-macroeconomic-concentration-framework)
 - [DAX Measure Intelligence](#-dax-measure-intelligence)
 - [Repository Map](#-repository-map)
 - [Quickstart & Reproduction](#-quickstart--reproduction)
-- [Data Governance & Documentation](#-data-governance--documentation)
+- [Documentation Suite](#-documentation-suite)
 - [Data Source & Attribution](#-data-source--attribution)
 
 ---
@@ -87,171 +87,89 @@ The **Global Billionaire Wealth to GDP (2026)** analytics suite provides an exec
 
 ---
 
-## 🏗️ System Architecture & Data Flow
+## 🏛️ Dimensional Semantic Model & Schema
 
-A streamlined, modern data pipeline transforming raw source dumps into interactive Power BI artifacts:
+The Power BI Semantic Model implements a star/snowflake dimensional model authored in TMDL. The architecture separates clean descriptive dimensions (`DimCountry`, `DimIndustry`) from granular individual and national facts (`FactBillionaire`, `FactCountrySnapshot`).
 
-```mermaid
-flowchart TD
-    classDef sourceStyle fill:#1E293B,stroke:#38BDF8,stroke-width:2px,color:#F8FAFC,rx:8,ry:8;
-    classDef storageStyle fill:#0F172A,stroke:#F59E0B,stroke-width:2px,color:#F8FAFC,rx:8,ry:8;
-    classDef engineStyle fill:#1E1E38,stroke:#10B981,stroke-width:2px,color:#F8FAFC,rx:8,ry:8;
-    classDef semanticStyle fill:#2A1B4E,stroke:#A855F7,stroke-width:2px,color:#F8FAFC,rx:8,ry:8;
-    classDef presentationStyle fill:#3B1124,stroke:#F43F5E,stroke-width:2px,color:#F8FAFC,rx:8,ry:8;
+<div align="center">
 
-    subgraph S1["🌐 1. Ingestion Layer"]
-        A1["📦 Kaggle Raw Dataset<br/>kanchana1990/global-billionaire-wealth-2026"]:::sourceStyle
-        A2["⚡ Forbes Real-Time Index<br/>Net Worth • Industry • Demographics"]:::sourceStyle
-        A3["🏛️ World Bank Indicators<br/>Nominal GDP • Population"]:::sourceStyle
-    end
+### 📊 Relational Entity-Relationship Diagram (ERD)
 
-    subgraph S2["💾 2. Raw Data Assets"]
-        B1[("📄 billionaire_individual_2026.csv<br/>3,384 Records • 25 Columns")]:::storageStyle
-        B2[("📄 billionaire_country_aggregate_2026.csv<br/>80 Jurisdictions • 23 Columns")]:::storageStyle
-    end
+<p align="center">
+  <img src="assets/erd-diagram.png" alt="Relational Semantic Model ERD" width="820" />
+</p>
 
-    subgraph S3["⚙️ 3. Power Query & M Engine"]
-        C1["🧹 Type Casting & Normalization<br/>Int64, Double, Boolean, Text"]:::engineStyle
-        C2["🔍 Edge Case Treatment<br/>Zero-Net-Worth Fallen Billionaires"]:::engineStyle
-    end
+### 📐 High-Level Dimensional Architecture
 
-    subgraph S4["🧠 4. Semantic Layer (TMDL / PBIP)"]
-        D1["📊 Country Aggregate Dimension (1)"]:::semanticStyle
-        D2["👥 Individual Billionaire Fact (*)"]:::semanticStyle
-        D3["📐 High-Performance DAX Measures<br/>Wealth-to-GDP • Density • Oligarchy Index"]:::semanticStyle
-    end
+<p align="center">
+  <img src="assets/datamodeling-diagram.png" alt="Dimensional Modeling Overview" width="550" />
+</p>
 
-    subgraph S5["📊 5. Analytical Visual Canvas"]
-        E1["🗺️ Geographic Exposure Maps"]:::presentationStyle
-        E2["🌲 Sector Dominance Treemaps"]:::presentationStyle
-        E3["⚖️ Self-Made vs. Inherited Quadrants"]:::presentationStyle
-        E4["📈 Demographic Age & Gender Matrix"]:::presentationStyle
-    end
+</div>
 
-    A1 --> B1
-    A2 --> B1
-    A3 --> B2
-    B1 --> C1
-    B2 --> C1
-    C1 --> D1
-    C1 --> D2
-    C2 --> D1
-    C2 --> D2
-    D1 -->|"1 to Many: country"| D2
-    D1 --> D3
-    D2 --> D3
-    D3 --> E1
-    D3 --> E2
-    D3 --> E3
-    D3 --> E4
-```
+### 🧩 Table Catalog & Cardinality
+
+| Table Name | Role | Primary Key | Foreign Keys | Record Count | Description |
+| :--- | :---: | :---: | :---: | :---: | :--- |
+| **`DimCountry`** | Dimension | `iso3` | — | 80 | Standardized sovereign countries and territories (`iso3`, `country`, `wb_country_name`). |
+| **`DimIndustry`** | Dimension | `industry` | — | 18 | Standardized global economic industry classifications. |
+| **`FactBillionaire`** | Fact | `rank` | `iso3`, `industry` | 3,384 | Granular micro fortunes with age, gender, state, city, net worth, source of wealth, and self-made flag. |
+| **`FactCountrySnapshot`** | Fact | `iso3` | `iso3` (1:1 Both) | 80 | Macroeconomic sovereign metrics: GDP, population, total wealth, mean/median wealth, and wealth tiers. |
+| **`_Measures`** | Measure Home | — | — | — | Centralized repository for all DAX measures (`Billionaire Count`, `Total Wealth USD`). |
 
 ---
 
-## 🧩 Relational Data Model (ERD)
+## ⚙️ Data Pipeline & Normalization Architecture
 
-The Power BI Semantic Model enforces a clean, high-performance dimensional schema connected via a single-column 1-to-Many (`1..*`) relationship on the `country` key.
+To ensure high data integrity and prevent many-to-many Cartesian explosion, the data pipeline implements dedicated normalization bridges:
 
-```mermaid
-erDiagram
-    billionaire_country_aggregate_2026 ||--o{ billionaire_individual_2026 : "country"
+<div align="center">
 
-    billionaire_country_aggregate_2026 {
-        int country_wealth_rank PK "Global wealth rank"
-        string country FK "Country common name"
-        string iso3 "ISO 3166-1 alpha-3 code"
-        string wb_country_name "Standardized World Bank name"
-        int billionaire_count "Total resident billionaires"
-        double total_wealth_usd_m "Aggregate wealth in USD Millions"
-        int64 total_wealth_usd "Aggregate wealth in absolute USD"
-        double mean_wealth_usd_m "Mean net worth in USD Millions"
-        double median_wealth_usd_m "Median net worth in USD Millions"
-        double max_wealth_usd_m "Top billionaire net worth in USD Millions"
-        string top_billionaire "Wealthiest resident individual"
-        string dominant_industry_by_wealth "Leading industry sector"
-        int self_made_count "Count of self-made individuals"
-        double self_made_ratio_pct "Self-made proportion percentage"
-        double mean_age "Average age of billionaires"
-        double country_wealth_gdp_pct "Total wealth as percent of national GDP"
-        double billionaires_per_million_pop "Billionaire density per million residents"
-        string wealth_concentration_tier "Macro exposure classification"
-        double gdp_per_billionaire_bn "National GDP per billionaire in USD Billions"
-        double sector_dominance_score "Primary sector concentration score"
-        double gdp_usd "Annual nominal GDP in USD"
-        int64 population "Total national population"
-        int gdp_year "GDP reference baseline year"
-    }
+### 🔀 Multi-Industry Parsing & Normalization Pipeline
 
-    billionaire_individual_2026 {
-        int rank PK "Global individual wealth rank"
-        string person_name "Full name of billionaire or family"
-        string gender "Gender classification"
-        float age "Age in years"
-        string country FK "Primary economic country"
-        string iso3 "ISO 3166-1 alpha-3 code"
-        string wb_country_name "Standardized World Bank name"
-        string state "State or province"
-        string city "City of primary residence"
-        double net_worth_usd_m "Net worth in USD Millions"
-        int64 net_worth_usd "Net worth in absolute USD"
-        string source_of_wealth "Primary company or asset origin"
-        string industries "Reported industry sector"
-        string primary_industry "Standardized industry category"
-        boolean self_made "Self-made or Inherited flag"
-        double wealth_gdp_ratio_pct "Individual net worth as percent of GDP"
-        double wealth_per_citizen_usd "Per-capita equivalent dividend"
-        double wealth_country_share_pct "Share of national billionaire wealth"
-        double sector_dominance_score "Sector dominance benchmark"
-        double gdp_usd "Country GDP in USD"
-        int64 population "Country population"
-        int gdp_year "GDP reference year"
-        string forbes_uri "Forbes profile slug identifier"
-        string scrape_timestamp "Data capture timestamp"
-        float birth_year "Inferred year of birth"
-    }
-```
+<p align="center">
+  <img src="assets/industry-diagram.png" alt="Industry Bridge & Normalization Flow" width="380" />
+</p>
+
+### 🛡️ Country Key & Referential Integrity Verification
+
+<p align="center">
+  <img src="assets/relationships-diagram.png" alt="Country Key ISO3 Validation Flow" width="650" />
+</p>
+
+</div>
 
 ---
 
-## 🌐 Macro Concentration Landscape
+## 🔍 Power Query Engineering & QA Audit Framework
+
+The Power BI project incorporates a structured Power Query ETL pipeline organized into 7 query groups:
+
+- **`00_Parameters & Functions`**: Centralized configuration (`p_DataFolderPath`, `p_SnapshotDate`) and re-usable text standardization functions (`fn_StandardizeCountry`, `fn_ParseIndustries`).
+- **`01_Source`**: Parameterized raw CSV connectors (`src_BillionaireIndividual`, `src_BillionaireCountry`).
+- **`02_Staging`**: Type-coerced and validated staging queries (`stg_BillionaireIndividual`, `stg_BillionaireCountry`).
+- **`03_Transformations`**: Industry bridge table generation (`int_BillionaireIndustryBridge`, `int_IndustryLookup`).
+- **`04_DataModel`**: Production dimension and fact tables (`DimCountry`, `DimIndustry`, `FactBillionaire`, `FactCountrySnapshot`).
+- **`05_QA & Reconciliation`**: 17 automated audit queries verifying key uniqueness, zero orphaned foreign keys, rank consistency, and balance sheet reconciliation ($19.64 Trillion exact match).
+- **`99_Archive`**: Legacy and staging archive tables.
+
+---
+
+## 🌐 Macroeconomic Concentration Framework
 
 Sovereign states are categorized across five distinct wealth-to-GDP tiers, illustrating contrasting economic models and fiscal exposure:
 
-```mermaid
-flowchart LR
-    classDef extreme fill:#450A0A,stroke:#EF4444,stroke-width:2px,color:#FEE2E2,rx:8,ry:8;
-    classDef veryHigh fill:#431407,stroke:#F97316,stroke-width:2px,color:#FFEDD5,rx:8,ry:8;
-    classDef high fill:#362B05,stroke:#EAB308,stroke-width:2px,color:#FEF9C3,rx:8,ry:8;
-    classDef moderate fill:#064E3B,stroke:#10B981,stroke-width:2px,color:#D1FAE5,rx:8,ry:8;
-    classDef low fill:#0C4A6E,stroke:#0EA5E9,stroke-width:2px,color:#E0F2FE,rx:8,ry:8;
+<div align="center">
 
-    T1["🚨 Extreme Tier<br/>40% or more of GDP<br/>9 Jurisdictions<br/>St. Kitts, Cyprus, HK, Israel"]:::extreme
-    T2["🔥 Very High Tier<br/>20% to 40% of GDP<br/>12 Nations<br/>USA, Russia, India, Germany"]:::veryHigh
-    T3["⚡ High Tier<br/>10% to 20% of GDP<br/>21 Nations<br/>China, France, Canada, Brazil"]:::high
-    T4["🌿 Moderate Tier<br/>3% to 10% of GDP<br/>29 Nations<br/>UK, Japan, South Korea, Turkey"]:::moderate
-    T5["💧 Low Tier<br/>Under 3% of GDP<br/>9 Nations<br/>Netherlands, Saudi Arabia, Poland"]:::low
+| Tier Classification | Wealth-to-GDP % | Sovereign Count | Representative Jurisdictions | Economic Characteristics |
+| :--- | :---: | :---: | :--- | :--- |
+| 🚨 **Extreme** | $\ge 40\%$ | 9 | St. Kitts & Nevis (860.7%), Cyprus (148.7%), HK (103.9%), Israel (42.4%) | Capital sanctuaries, financial hubs, and citizenship-by-investment states. |
+| 🔥 **Very High** | $20\%\text{ to }<40\%$ | 12 | United States (29.0%), Russia (30.1%), India (25.3%), Germany (21.0%) | Major industrial superpowers with massive domestic billionaire conglomerates. |
+| ⚡ **High** | $10\%\text{ to }<20\%$ | 21 | China (11.4%), France (18.7%), Canada (19.8%), Brazil (12.1%) | Diversified large economies with balanced corporate distributions. |
+| 🌿 **Moderate** | $3\%\text{ to }<10\%$ | 29 | United Kingdom (7.3%), Japan (5.4%), South Korea (8.7%), Turkey (8.4%) | Advanced OECD economies with distributed corporate equity ownership. |
+| 💧 **Low** | $< 3\%$ | 9 | Netherlands (2.9%), Saudi Arabia (2.1%), Poland (1.6%), South Africa (1.9%) | Resource economies with sovereign wealth funds or emerging corporate sectors. |
 
-    T1 --> T2 --> T3 --> T4 --> T5
-```
-
----
-
-## 🧬 Capital Origin Dynamics
-
-```mermaid
-flowchart TD
-    classDef selfMadeStyle fill:#064E3B,stroke:#10B981,stroke-width:2px,color:#ECFDF5,rx:8,ry:8;
-    classDef inheritedStyle fill:#3B0764,stroke:#C084FC,stroke-width:2px,color:#FAF5FF,rx:8,ry:8;
-    classDef rootStyle fill:#0F172A,stroke:#64748B,stroke-width:2px,color:#F8FAFC,rx:8,ry:8;
-
-    R["🌍 3,384 Global Fortunes: $19.64 Trillion"]:::rootStyle
-    
-    R --> S["🚀 Self-Made Fortunes<br/>66.6% Share • 2,255 Billionaires<br/>Tech Founders & Industrialists"]:::selfMadeStyle
-    R --> I["🏛️ Inherited Fortunes<br/>33.4% Share • 1,129 Billionaires<br/>Multi-Generational Wealth Dynasties"]:::inheritedStyle
-
-    S --> SC["🇨🇳 China: 97.2% Self-Made<br/>🇷🇺 Russia: 94.0% Self-Made<br/>🇺🇸 USA: 72.2% Self-Made"]:::selfMadeStyle
-    I --> IC["🇩🇪 Germany: 73.1% Inherited<br/>🇪🇸 Spain: 75.0% Inherited<br/>🇫🇷 France: 53.7% Inherited"]:::inheritedStyle
-```
+</div>
 
 ---
 
@@ -259,39 +177,45 @@ flowchart TD
 
 Key analytical formulas implemented in the semantic layer:
 
-### 1. Cumulative Billionaire Net Worth ($M)
+### 1. Total Filtered Billionaire Count
 ```dax
-Total Billionaire Wealth ($M) = 
-SUM(billionaire_individual_2026[net_worth_usd_m])
+Billionaire Count = 
+COUNTROWS(FactBillionaire)
 ```
 
-### 2. Weighted Wealth-to-GDP Concentration Ratio
+### 2. Cumulative Billionaire Net Worth ($ USD)
+```dax
+Total Billionaire Wealth USD = 
+SUM(FactBillionaire[net_worth_usd])
+```
+
+### 3. Weighted Wealth-to-GDP Concentration Ratio
 ```dax
 Billionaire Wealth to GDP % = 
-VAR TotalWealthUSD = SUM(billionaire_country_aggregate_2026[total_wealth_usd])
-VAR NationalGDP = AVERAGE(billionaire_country_aggregate_2026[gdp_usd])
+VAR TotalWealthUSD = SUM(FactCountrySnapshot[total_wealth_usd])
+VAR NationalGDP = AVERAGE(FactCountrySnapshot[gdp_usd])
 RETURN
     DIVIDE(TotalWealthUSD, NationalGDP, 0) * 100
 ```
 
-### 3. Self-Made Entrepreneurial Share
+### 4. Self-Made Entrepreneurial Share
 ```dax
 Self-Made Ratio % = 
-VAR TotalCount = COUNTROWS(billionaire_individual_2026)
+VAR TotalCount = COUNTROWS(FactBillionaire)
 VAR SelfMadeCount = 
     CALCULATE(
-        COUNTROWS(billionaire_individual_2026),
-        billionaire_individual_2026[self_made] = TRUE()
+        COUNTROWS(FactBillionaire),
+        FactBillionaire[self_made] = TRUE()
     )
 RETURN
     DIVIDE(SelfMadeCount, TotalCount, 0) * 100
 ```
 
-### 4. Per-Capita Billionaire Density
+### 5. Per-Capita Billionaire Density
 ```dax
 Billionaires Per Million Pop = 
-VAR TotalBillionaires = SUM(billionaire_country_aggregate_2026[billionaire_count])
-VAR TotalPopulation = AVERAGE(billionaire_country_aggregate_2026[population])
+VAR TotalBillionaires = SUM(FactCountrySnapshot[billionaire_count])
+VAR TotalPopulation = AVERAGE(FactCountrySnapshot[population])
 RETURN
     DIVIDE(TotalBillionaires, (TotalPopulation / 1000000), 0)
 ```
@@ -308,29 +232,40 @@ Global-Billionaire-Wealth-2026/
 │   │   ├── config.yml                      # Template links configuration
 │   │   ├── data_inquiry.md                 # Methodology inquiries
 │   │   └── feature_request.md              # New feature proposals
-│   ├── workflows/                          # GitHub Actions workflows
-│   │   └── ci.yml                          # Data integrity & PBIP validation
+│   ├── workflows/                          # GitHub Actions CI
+│   │   └── ci.yml                          # Automated data integrity & model test
 │   └── pull_request_template.md            # PR review checklist
-├── assets/                                 # Visual media & architecture renders
-│   └── mermaid-diagram.png                 # Exported diagram image
+├── assets/                                 # Architectural & schema diagram renders
+│   ├── datamodeling-diagram.png            # Dimensional model layout (Dim -> Fact)
+│   ├── erd-diagram.png                     # Full semantic entity-relationship diagram
+│   ├── industry-diagram.png                # Industry normalization bridge flow
+│   ├── mermaid-diagram.png                 # Canonical ERD schema capture
+│   └── relationships-diagram.png           # Country key validation & reconciliation
 ├── data/                                   # Data assets
 │   └── raw/                                # Raw immutable datasets
 │       ├── billionaire_country_aggregate_2026.csv  # 80 countries aggregate data
 │       └── billionaire_individual_2026.csv         # 3,384 individuals data
 ├── docs/                                   # Deep documentation suite
 │   ├── business_questions.md               # 8+ macroeconomic research questions
-│   ├── data_dictionary.md                  # Complete 48-field data dictionary
-│   ├── data_quality_log.md                 # Validation audit & anomaly log
+│   ├── data_dictionary.md                  # Complete dimensional schema dictionary
+│   ├── data_quality_log.md                 # Audit logs & Power Query QA checks
 │   └── methodology_and_limitations.md      # Valuation & macro limitations
 ├── exports/                                # Presentation exports & captures
 │   ├── published_assets/                   # PDF/PPT deck outputs
-│   └── report_screenshots/                 # Power BI canvas captures
+│   ├── report_screenshots/                 # Power BI canvas captures
+│   └── README.md                           # Exports folder manifest & guidelines
 ├── powerbi/                                # Power BI Project (PBIP Developer Mode)
 │   ├── Global_Billionaire_Wealth_2026.pbip # Main project launchpad
-│   ├── Global_Billionaire_Wealth_2026.Report/       # Visual page definitions & JSON
+│   ├── Global_Billionaire_Wealth_2026.Report/       # Visual page definitions & layout
 │   └── Global_Billionaire_Wealth_2026.SemanticModel/ # TMDL tabular model & schemas
+│       └── definition/
+│           ├── tables/                     # DimCountry, DimIndustry, FactBillionaire, etc.
+│           ├── database.tmdl
+│           ├── expressions.tmdl            # Staging, QA & transformation M-queries
+│           ├── model.tmdl                  # Query groups & model metadata
+│           └── relationships.tmdl          # Star-schema relationships
 ├── scripts/                                # Automation & validation scripts
-│   └── validate_data.py                    # Cross-platform data integrity test
+│   └── validate_data.py                    # Cross-platform data & PBIP integrity suite
 ├── .gitattributes                          # Git LF normalization & TMDL rules
 ├── .gitignore                              # PBIP, Python, and OS ignore rules
 ├── CONTRIBUTING.md                         # Contribution guide & DAX standards
@@ -356,7 +291,7 @@ Global-Billionaire-Wealth-2026/
 git clone https://github.com/<your-username>/Global-Billionaire-Wealth-2026.git
 cd Global-Billionaire-Wealth-2026
 
-# 2. Run data integrity & schema validation
+# 2. Run data integrity & semantic model validation
 python scripts/validate_data.py
 
 # 3. Launch Power BI Developer Project
@@ -365,15 +300,15 @@ python scripts/validate_data.py
 
 ---
 
-## 📖 Data Governance & Documentation
+## 📖 Documentation Suite
 
 Deep-dive documentation available in [`docs/`](docs/):
 
 | Resource | Scope & Purpose |
 | :--- | :--- |
-| 📘 [Data Dictionary](docs/data_dictionary.md) | Full 48-column schema definitions, data types, null rules, and tier descriptions. |
+| 📘 [Data Dictionary](docs/data_dictionary.md) | Full dimensional schema dictionary (`DimCountry`, `DimIndustry`, `FactBillionaire`, `FactCountrySnapshot`). |
 | ❓ [Business Questions](docs/business_questions.md) | Detailed analysis of 8 core macroeconomic research questions with DAX formulations. |
-| 🛡️ [Data Quality Log](docs/data_quality_log.md) | Audit logs, reconciliation verification, fallen billionaire handling, and outlier registry. |
+| 🛡️ [Data Quality Log](docs/data_quality_log.md) | Audit logs, Power Query QA queries, fallen billionaire handling, and outlier registry. |
 | 🔬 [Methodology & Limitations](docs/methodology_and_limitations.md) | Economic stock vs. flow analysis, residency distortions, and valuation constraints. |
 
 ---
