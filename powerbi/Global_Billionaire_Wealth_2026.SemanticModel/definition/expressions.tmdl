@@ -229,6 +229,8 @@ expression p_SnapshotDate =
 	lineageTag: fbec51b0-f767-4b1c-9ad4-881658b8a8d1
 	queryGroup: '00_Parameters & Functions'
 
+	annotation PBI_ResultType = Date
+
 expression fn_StandardizeCountry =
 		let
 		    Source = (CountryName as nullable text) as nullable text =>
@@ -3391,4 +3393,310 @@ expression tmp_CountryReconciliationSummary =
 	queryGroup: '05_QA & Reconciliation'
 
 	annotation PBI_ResultType = Table
+
+expression tmp_CountryMetricDetailSummary =
+		let
+		    Source =
+		        qa_CountryMetricDetail,
+		
+		    Summaries = {
+		        [
+		            Metric = "Mean wealth",
+		            Column = "Mean_Wealth_Status",
+		            PassedLabel = "Within source precision"
+		        ],
+		        [
+		            Metric = "Median wealth",
+		            Column = "Median_Wealth_Status",
+		            PassedLabel = "Within source precision"
+		        ],
+		        [
+		            Metric = "Maximum wealth",
+		            Column = "Maximum_Wealth_Status",
+		            PassedLabel = "Within source precision"
+		        ],
+		        [
+		            Metric = "Mean age",
+		            Column = "Mean_Age_Status",
+		            PassedLabel = "Within source precision"
+		        ],
+		        [
+		            Metric = "Self-made count",
+		            Column = "Self_Made_Count_Status",
+		            PassedLabel = "Matched"
+		        ],
+		        [
+		            Metric = "Top billionaire",
+		            Column = "Top_Billionaire_Status",
+		            PassedLabel = null
+		        ]
+		    },
+		
+		    ResultRecords =
+		        List.Transform(
+		            Summaries,
+		            (Item) =>
+		                let
+		                    Values =
+		                        Table.Column(
+		                            Source,
+		                            Item[Column]
+		                        ),
+		
+		                    Passed =
+		                        if Item[Metric] = "Top billionaire" then
+		                            List.Count(
+		                                List.Select(
+		                                    Values,
+		                                    each
+		                                        _ = "Matched"
+		                                        or _ = "Matched - tie represented by one name"
+		                                )
+		                            )
+		                        else
+		                            List.Count(
+		                                List.Select(
+		                                    Values,
+		                                    each _ = Item[PassedLabel]
+		                                )
+		                            ),
+		
+		                    Investigate =
+		                        List.Count(
+		                            List.Select(
+		                                Values,
+		                                each _ = "Investigate"
+		                            )
+		                        )
+		                in
+		                    [
+		                        Metric = Item[Metric],
+		                        Countries_Passed = Passed,
+		                        Countries_Investigated = Investigate
+		                    ]
+		        ),
+		
+		    Result =
+		        Table.FromRecords(ResultRecords)
+		in
+		    Result
+	lineageTag: b69c5445-db2a-4ca4-99c4-ab88c508037f
+	queryGroup: '05_QA & Reconciliation'
+
+	annotation PBI_ResultType = Table
+
+expression qa_CountryMetricDetail =
+		let
+		    Source =
+		        qa_CountryReconciliation,
+		
+		    // =========================================
+		    // 1. WEALTH DIFFERENCES
+		    // Values are in USD millions
+		    // =========================================
+		
+		    MeanDifference =
+		        Table.AddColumn(
+		            Source,
+		            "Mean_Wealth_Difference_USD_M",
+		            each Number.Abs(
+		                [Individual_Mean_Wealth_USD_M]
+		                - [Aggregate_Mean_Wealth_USD_M]
+		            ),
+		            type number
+		        ),
+		
+		    MedianDifference =
+		        Table.AddColumn(
+		            MeanDifference,
+		            "Median_Wealth_Difference_USD_M",
+		            each Number.Abs(
+		                [Individual_Median_Wealth_USD_M]
+		                - [Aggregate_Median_Wealth_USD_M]
+		            ),
+		            type number
+		        ),
+		
+		    MaximumDifference =
+		        Table.AddColumn(
+		            MedianDifference,
+		            "Maximum_Wealth_Difference_USD_M",
+		            each Number.Abs(
+		                [Individual_Max_Wealth_USD_M]
+		                - [Aggregate_Max_Wealth_USD_M]
+		            ),
+		            type number
+		        ),
+		
+		    // =========================================
+		    // 2. DEMOGRAPHIC AND SELF-MADE DIFFERENCES
+		    // =========================================
+		
+		    AgeDifference =
+		        Table.AddColumn(
+		            MaximumDifference,
+		            "Mean_Age_Difference",
+		            each Number.Abs(
+		                [Individual_Mean_Age]
+		                - [Aggregate_Mean_Age]
+		            ),
+		            type number
+		        ),
+		
+		    SelfMadeDifference =
+		        Table.AddColumn(
+		            AgeDifference,
+		            "Self_Made_Count_Difference",
+		            each
+		                [Individual_Self_Made_Count]
+		                - [Aggregate_Self_Made_Count],
+		            Int64.Type
+		        ),
+		
+		    // =========================================
+		    // 3. SELECT A DETERMINISTIC TOP REPRESENTATIVE
+		    // Preserve the original list of tied names
+		    // in the base reconciliation query
+		    // =========================================
+		
+		    TopRepresentative =
+		        Table.AddColumn(
+		            SelfMadeDifference,
+		            "Individual_Top_Representative",
+		            each
+		                let
+		                    Names =
+		                        if [Individual_Top_Billionaire] = null
+		                        then {}
+		                        else
+		                            Text.Split(
+		                                [Individual_Top_Billionaire],
+		                                " | "
+		                            )
+		                in
+		                    if List.IsEmpty(Names)
+		                    then null
+		                    else List.First(Names),
+		            type nullable text
+		        ),
+		
+		    // =========================================
+		    // 4. MEAN WEALTH STATUS
+		    // Tolerance: 0.005 million USD
+		    // =========================================
+		
+		    MeanStatus =
+		        Table.AddColumn(
+		            TopRepresentative,
+		            "Mean_Wealth_Status",
+		            each
+		                if Number.Round(
+		                    [Mean_Wealth_Difference_USD_M],
+		                    6
+		                ) <= 0.005
+		                then "Within source precision"
+		                else "Investigate",
+		            type text
+		        ),
+		
+		    MedianStatus =
+		        Table.AddColumn(
+		            MeanStatus,
+		            "Median_Wealth_Status",
+		            each
+		                if Number.Round(
+		                    [Median_Wealth_Difference_USD_M],
+		                    6
+		                ) <= 0.005
+		                then "Within source precision"
+		                else "Investigate",
+		            type text
+		        ),
+		
+		    MaximumStatus =
+		        Table.AddColumn(
+		            MedianStatus,
+		            "Maximum_Wealth_Status",
+		            each
+		                if Number.Round(
+		                    [Maximum_Wealth_Difference_USD_M],
+		                    6
+		                ) <= 0.005
+		                then "Within source precision"
+		                else "Investigate",
+		            type text
+		        ),
+		
+		    AgeStatus =
+		        Table.AddColumn(
+		            MaximumStatus,
+		            "Mean_Age_Status",
+		            each
+		                if Number.Round(
+		                    [Mean_Age_Difference],
+		                    6
+		                ) <= 0.05
+		                then "Within source precision"
+		                else "Investigate",
+		            type text
+		        ),
+		
+		    // =========================================
+		    // 5. SELF-MADE COUNT STATUS
+		    // =========================================
+		
+		    SelfMadeStatus =
+		        Table.AddColumn(
+		            AgeStatus,
+		            "Self_Made_Count_Status",
+		            each
+		                if [Self_Made_Count_Difference] = 0
+		                then "Matched"
+		                else "Investigate",
+		            type text
+		        ),
+		
+		    // =========================================
+		    // 6. TOP BILLIONAIRE STATUS
+		    // Compare one representative, not all tied names
+		    // =========================================
+		
+		    TopStatus =
+		        Table.AddColumn(
+		            SelfMadeStatus,
+		            "Top_Billionaire_Status",
+		            each
+		                let
+		                    IndividualName =
+		                        [Individual_Top_Representative],
+		
+		                    AggregateName =
+		                        [Aggregate_Top_Billionaire],
+		
+		                    NamesMatch =
+		                        if IndividualName = null
+		                            or AggregateName = null
+		                        then false
+		                        else
+		                            Text.Upper(
+		                                Text.Trim(IndividualName)
+		                            )
+		                            =
+		                            Text.Upper(
+		                                Text.Trim(AggregateName)
+		                            )
+		                in
+		                    if not NamesMatch then
+		                        "Investigate"
+		                    else if [Individual_Top_Wealth_Tie_Count] > 1 then
+		                        "Matched - tie represented by one name"
+		                    else
+		                        "Matched",
+		            type text
+		        )
+		
+		in
+		    TopStatus
+	lineageTag: 6195d1c5-cdf2-4b7a-8fb5-40b23d6e777f
+	queryGroup: '05_QA & Reconciliation'
 
