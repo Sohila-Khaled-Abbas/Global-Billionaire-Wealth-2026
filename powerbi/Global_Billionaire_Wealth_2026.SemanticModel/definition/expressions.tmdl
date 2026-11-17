@@ -3744,3 +3744,50 @@ expression tmp_DimCountryValidation =
 	lineageTag: 591dcbbb-365c-4629-aaea-3e7e60197e46
 	queryGroup: 99_Archive
 
+expression tmp_DimIndustryValidation =
+		let
+		    Source = DimIndustry,
+		
+		    Industries =
+		        List.RemoveNulls(Source[industry]),
+		
+		    DistinctIndustries =
+		        List.Distinct(Industries),
+		
+		    Result =
+		        #table(
+		            type table [
+		                Check = text,
+		                Actual = number,
+		                Expected = number,
+		                Status = text
+		            ],
+		            {
+		                {
+		                    "Dimension rows",
+		                    Table.RowCount(Source),
+		                    18,
+		                    if Table.RowCount(Source) = 18
+		                    then "Passed" else "Investigate"
+		                },
+		                {
+		                    "Distinct industry keys",
+		                    List.Count(DistinctIndustries),
+		                    18,
+		                    if List.Count(DistinctIndustries) = 18
+		                    then "Passed" else "Investigate"
+		                },
+		                {
+		                    "Missing industry keys",
+		                    Table.RowCount(Source) - List.Count(Industries),
+		                    0,
+		                    if Table.RowCount(Source) = List.Count(Industries)
+		                    then "Passed" else "Investigate"
+		                }
+		            }
+		        )
+		in
+		    Result
+	lineageTag: c57ed335-5796-4bcd-b0e8-8340bc6980db
+	queryGroup: 99_Archive
+
