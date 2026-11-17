@@ -10,14 +10,6 @@ table FactBillionaire
 
 		annotation SummarizationSetBy = Automatic
 
-	column person_name
-		dataType: string
-		lineageTag: b622c776-ec73-493b-9586-bc3d1da476c6
-		summarizeBy: none
-		sourceColumn: person_name
-
-		annotation SummarizationSetBy = Automatic
-
 	column gender
 		dataType: string
 		lineageTag: 86e24841-9a59-4a98-9101-b73bf0b2e318
@@ -46,22 +38,6 @@ table FactBillionaire
 
 		annotation SummarizationSetBy = Automatic
 
-	column state
-		dataType: string
-		lineageTag: 4eb895cb-85af-4625-bb14-2b056838b859
-		summarizeBy: none
-		sourceColumn: state
-
-		annotation SummarizationSetBy = Automatic
-
-	column city
-		dataType: string
-		lineageTag: 0e9e0245-15d7-41e8-91bb-a0eae1c007f2
-		summarizeBy: none
-		sourceColumn: city
-
-		annotation SummarizationSetBy = Automatic
-
 	column net_worth_usd
 		dataType: decimal
 		lineageTag: cd484e7c-0030-451c-9660-7315fb10fbc9
@@ -71,25 +47,6 @@ table FactBillionaire
 		annotation SummarizationSetBy = Automatic
 
 		annotation PBI_FormatHint = {"isGeneralNumber":true}
-
-	column source_of_wealth
-		dataType: string
-		lineageTag: 995f3334-fcb4-4e30-a9d3-3d1cb17eb449
-		summarizeBy: none
-		sourceColumn: source_of_wealth
-
-		annotation SummarizationSetBy = Automatic
-
-	column industry
-		dataType: string
-		isHidden
-		lineageTag: 3f200cbc-4cf9-4f0c-9289-67bc38cd0943
-		summarizeBy: none
-		sourceColumn: industry
-
-		changedProperty = IsHidden
-
-		annotation SummarizationSetBy = Automatic
 
 	column self_made
 		dataType: boolean
@@ -143,6 +100,110 @@ table FactBillionaire
 
 		annotation UnderlyingDateTimeDataType = Date
 
+	column person_name
+		dataType: string
+		lineageTag: b0e159f6-0047-4eb8-86f4-16ba8b303ecf
+		summarizeBy: none
+		sourceColumn: person_name
+
+		annotation SummarizationSetBy = Automatic
+
+	column source_of_wealth
+		dataType: string
+		lineageTag: d2399730-5783-49f1-98d8-1796cd2530a8
+		summarizeBy: none
+		sourceColumn: source_of_wealth
+
+		annotation SummarizationSetBy = Automatic
+
+	column industry
+		dataType: string
+		lineageTag: 31d42cc1-f165-4e8b-bf92-592341e41f4d
+		summarizeBy: none
+		sourceColumn: industry
+
+		annotation SummarizationSetBy = Automatic
+
+	column state
+		dataType: string
+		lineageTag: 97b18c6a-3250-4c12-8367-969be367fe9b
+		summarizeBy: none
+		sourceColumn: state
+
+		annotation SummarizationSetBy = Automatic
+
+	column city
+		dataType: string
+		lineageTag: 5c924184-cf7b-4e3a-b871-f801ba05c696
+		summarizeBy: none
+		sourceColumn: city
+
+		annotation SummarizationSetBy = Automatic
+
+	column wealth_gdp_ratio_pct
+		dataType: double
+		lineageTag: e3c36e04-8b04-471c-8ad7-4d809300c825
+		summarizeBy: sum
+		sourceColumn: wealth_gdp_ratio_pct
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column wealth_per_citizen_usd
+		dataType: decimal
+		formatString: "AED"#,0.###############;-"AED"#,0.###############;"AED"#,0.###############
+		lineageTag: f1f89a20-0ab7-49cc-aaf0-8027e29fed08
+		summarizeBy: sum
+		sourceColumn: wealth_per_citizen_usd
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"currencyCulture":"en-AE"}
+
+	column wealth_country_share_pct
+		dataType: double
+		lineageTag: 0df0a8a5-e6c0-4cda-989d-21ffde9d2e33
+		summarizeBy: sum
+		sourceColumn: wealth_country_share_pct
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column age_band
+		dataType: string
+		lineageTag: 082638cc-fb21-4305-a4ad-f7c4bbf683c6
+		summarizeBy: none
+		sourceColumn: age_band
+
+		annotation SummarizationSetBy = Automatic
+
+	column self_made_label
+		dataType: string
+		lineageTag: c5811fb2-31e0-414a-92e6-723411f8212e
+		summarizeBy: none
+		sourceColumn: self_made_label
+
+		annotation SummarizationSetBy = Automatic
+
+	column wealth_tier
+		dataType: string
+		lineageTag: 5bbdac43-cf67-440b-b38c-8f488a1f0047
+		summarizeBy: none
+		sourceColumn: wealth_tier
+
+		annotation SummarizationSetBy = Automatic
+
+	column wealth_tier_sort
+		dataType: int64
+		formatString: 0
+		lineageTag: 29305fe2-e8ed-44b8-a592-47ae8ee48d42
+		summarizeBy: sum
+		sourceColumn: wealth_tier_sort
+
+		annotation SummarizationSetBy = Automatic
+
 	partition FactBillionaire = m
 		mode: import
 		queryGroup: 04_DataModel\Facts
@@ -160,25 +221,7 @@ table FactBillionaire
 				    // =========================================
 				
 				    SelectedColumns =
-				        Table.SelectColumns(
-				            Source,
-				            {
-				                "forbes_uri",
-				                "rank",
-				                "person_name",
-				                "iso3",
-				                "gender",
-				                "age",
-				                "birth_year",
-				                "state",
-				                "city",
-				                "net_worth_usd",
-				                "source_of_wealth",
-				                "primary_industry",
-				                "self_made",
-				                "scrape_timestamp"
-				            }
-				        ),
+				        Table.SelectColumns(Source, {"rank", "person_name", "gender", "age", "iso3", "state", "city", "net_worth_usd", "source_of_wealth", "primary_industry", "self_made", "wealth_gdp_ratio_pct", "wealth_per_citizen_usd", "wealth_country_share_pct", "forbes_uri", "scrape_timestamp", "birth_year"}),
 				
 				    // =========================================
 				    // 3. RENAME INDUSTRY FOREIGN KEY
@@ -228,8 +271,38 @@ table FactBillionaire
 				            "snapshot_date",
 				            each p_SnapshotDate,
 				            type date
-				        )
-				
+				        ),
+				  #"Changed column type" = Table.TransformColumnTypes(AddSnapshotDate, {{"wealth_per_citizen_usd", Currency.Type}}),
+				  #"Invoked custom function" = Table.TransformColumnTypes(Table.AddColumn(#"Changed column type", "person_name_clean", each fn_CleanText([person_name])), {{"person_name_clean", type text}}),
+				  #"Invoked custom function 1" = Table.TransformColumnTypes(Table.AddColumn(#"Invoked custom function", "source_of_wealth_clean", each fn_CleanText([source_of_wealth])), {{"source_of_wealth_clean", type text}}),
+				  #"Invoked custom function 2" = Table.TransformColumnTypes(Table.AddColumn(#"Invoked custom function 1", "industry_clean", each fn_CleanText([industry])), {{"industry_clean", type text}}),
+				  #"Invoked custom function 3" = Table.TransformColumnTypes(Table.AddColumn(#"Invoked custom function 2", "state_clean", each fn_CleanText([state])), {{"state_clean", type text}}),
+				  #"Invoked custom function 4" = Table.TransformColumnTypes(Table.AddColumn(#"Invoked custom function 3", "city_clean", each fn_CleanText([city])), {{"city_clean", type text}}),
+				  #"Removed columns" = Table.RemoveColumns(#"Invoked custom function 4", {"person_name", "state", "city", "source_of_wealth", "industry"}),
+				  #"Reordered columns" = Table.ReorderColumns(#"Removed columns", {"rank", "person_name_clean", "source_of_wealth_clean", "industry_clean", "state_clean", "city_clean", "gender", "age", "iso3", "net_worth_usd", "self_made", "wealth_gdp_ratio_pct", "wealth_per_citizen_usd", "wealth_country_share_pct", "forbes_uri", "scrape_timestamp", "birth_year", "snapshot_date"}),
+				  #"Renamed columns" = Table.RenameColumns(#"Reordered columns", {{"person_name_clean", "person_name"}, {"source_of_wealth_clean", "source_of_wealth"}, {"industry_clean", "industry"}, {"state_clean", "state"}, {"city_clean", "city"}}),
+				  #"Inserted conditional column" = Table.AddColumn(#"Renamed columns", "wealth_tier", each if [net_worth_usd] < 1000000000 then "Below $1B" else if [net_worth_usd] < 5000000000 then "$1B to under $5B" else if [net_worth_usd] < 10000000000 then "$5B to under $10B" else if [net_worth_usd] < 50000000000 then "$10B to under $50B" else if [net_worth_usd] < 100000000000 then "$50B to under $100B" else "$100B+", type text),
+				  #"Added rank column" = Table.AddRankColumn(#"Inserted conditional column", "wealth_tier_sort", {{"wealth_tier", Order.Descending}}),
+				  #"Reordered columns 1" = Table.ReorderColumns(#"Added rank column", {"rank", "person_name", "source_of_wealth", "industry", "state", "city", "gender", "age", "iso3", "net_worth_usd", "self_made", "wealth_gdp_ratio_pct", "wealth_per_citizen_usd", "wealth_country_share_pct", "wealth_tier", "wealth_tier_sort", "forbes_uri", "scrape_timestamp", "birth_year", "snapshot_date"}),
+				  #"Inserted conditional column 1" = Table.AddColumn(
+				        #"Reordered columns 1",
+				        "age_band",
+				        each
+				            if [age] = null then "Not disclosed"
+				            else if [age] < 30 then "Under 30"
+				            else if [age] < 40 then "30–39"
+				            else if [age] < 50 then "40–49"
+				            else if [age] < 60 then "50–59"
+				            else if [age] < 70 then "60–69"
+				            else if [age] < 80 then "70–79"
+				            else "80+",
+				        type text
+				    ),
+				  #"Reordered columns 2" = Table.ReorderColumns(#"Inserted conditional column 1", {"rank", "person_name", "source_of_wealth", "industry", "state", "city", "gender", "age", "age_band", "iso3", "net_worth_usd", "self_made", "wealth_gdp_ratio_pct", "wealth_per_citizen_usd", "wealth_country_share_pct", "wealth_tier", "wealth_tier_sort", "forbes_uri", "scrape_timestamp", "birth_year", "snapshot_date"}),
+				  #"Inserted conditional column 2" = Table.AddColumn(#"Reordered columns 2", "self_made_label", each if [self_made] = true then "Self-made" else "Inherited / family wealth", type text),
+				  #"Reordered columns 3" = Table.ReorderColumns(#"Inserted conditional column 2", {"rank", "person_name", "source_of_wealth", "industry", "state", "city", "gender", "age", "age_band", "iso3", "net_worth_usd", "self_made", "self_made_label", "wealth_gdp_ratio_pct", "wealth_per_citizen_usd", "wealth_country_share_pct", "wealth_tier", "wealth_tier_sort", "forbes_uri", "scrape_timestamp", "birth_year", "snapshot_date"})
 				in
-				    AddSnapshotDate
+				    #"Reordered columns 3"
+
+	annotation PBI_ResultType = Table
 
