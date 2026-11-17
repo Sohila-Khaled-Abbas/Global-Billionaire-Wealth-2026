@@ -399,11 +399,206 @@ expression tmp_SourceValidation =
 
 expression qa_IndividualByCountry =
 		let
-		  Source = stg_BillionaireIndividual,
-		  #"Choose columns" = Table.SelectColumns(Source, {"iso3", "net_worth_usd"}),
-		  #"Grouped rows" = Table.Group(#"Choose columns", {"iso3"}, {{"Individual_Billionaire_Count", each Table.RowCount(_), Int64.Type}, {"Individual_Total_Wealth_USD", each List.Sum([net_worth_usd]), type nullable number}})
+		    // =========================================
+		    // 1. SOURCE
+		    // =========================================
+		
+		    Source =
+		        stg_BillionaireIndividual,
+		
+		    // =========================================
+		    // 2. GROUP BY COUNTRY
+		    // Each row represents one country
+		    // =========================================
+		
+		    GroupedByCountry =
+		        Table.Group(
+		            Source,
+		            {"iso3"},
+		            {
+		                // Billionaire count
+		                {
+		                    "Individual_Billionaire_Count",
+		                    each Table.RowCount(_),
+		                    Int64.Type
+		                },
+		
+		                // Total individual wealth in USD
+		                {
+		                    "Individual_Total_Wealth_USD",
+		                    each
+		                        List.Sum(
+		                            List.RemoveNulls(
+		                                [net_worth_usd]
+		                            )
+		                        ),
+		                    Currency.Type
+		                },
+		
+		                // Mean wealth in USD millions
+		                {
+		                    "Individual_Mean_Wealth_USD_M",
+		                    each
+		                        let
+		                            Values =
+		                                List.RemoveNulls(
+		                                    [net_worth_usd]
+		                                )
+		                        in
+		                            if List.IsEmpty(Values) then
+		                                null
+		                            else
+		                                List.Average(Values) / 1000000,
+		                    type nullable number
+		                },
+		
+		                // Median wealth in USD millions
+		                {
+		                    "Individual_Median_Wealth_USD_M",
+		                    each
+		                        let
+		                            Values =
+		                                List.RemoveNulls(
+		                                    [net_worth_usd]
+		                                )
+		                        in
+		                            if List.IsEmpty(Values) then
+		                                null
+		                            else
+		                                List.Median(Values) / 1000000,
+		                    type nullable number
+		                },
+		
+		                // Maximum individual wealth
+		                {
+		                    "Individual_Max_Wealth_USD_M",
+		                    each
+		                        let
+		                            Values =
+		                                List.RemoveNulls(
+		                                    [net_worth_usd]
+		                                )
+		                        in
+		                            if List.IsEmpty(Values) then
+		                                null
+		                            else
+		                                List.Max(Values) / 1000000,
+		                    type nullable number
+		                },
+		
+		                // Self-made billionaire count
+		                {
+		                    "Individual_Self_Made_Count",
+		                    each
+		                        List.Count(
+		                            List.Select(
+		                                [self_made],
+		                                each _ = true
+		                            )
+		                        ),
+		                    Int64.Type
+		                },
+		
+		                // Mean age, excluding missing values
+		                {
+		                    "Individual_Mean_Age",
+		                    each
+		                        let
+		                            Ages =
+		                                List.RemoveNulls([age])
+		                        in
+		                            if List.IsEmpty(Ages) then
+		                                null
+		                            else
+		                                List.Average(Ages),
+		                    type nullable number
+		                },
+		
+		                // Highest billionaire wealth
+		                {
+		                    "Individual_Top_Wealth_USD",
+		                    each
+		                        List.Max(
+		                            List.RemoveNulls(
+		                                [net_worth_usd]
+		                            )
+		                        ),
+		                    Currency.Type
+		                },
+		
+		                // Names of all people tied at maximum wealth
+		                {
+		                    "Individual_Top_Billionaire",
+		                    each
+		                        let
+		                            GroupRows = _,
+		
+		                            MaximumWealth =
+		                                List.Max(
+		                                    List.RemoveNulls(
+		                                        GroupRows[net_worth_usd]
+		                                    )
+		                                ),
+		
+		                            TopRows =
+		                                Table.SelectRows(
+		                                    GroupRows,
+		                                    each
+		                                        [net_worth_usd]
+		                                        = MaximumWealth
+		                                ),
+		
+		                            TopNames =
+		                                List.Sort(
+		                                    List.RemoveNulls(
+		                                        TopRows[person_name]
+		                                    )
+		                                )
+		                        in
+		                            Text.Combine(TopNames, " | "),
+		                    type text
+		                },
+		
+		                // Number of people tied at maximum wealth
+		                {
+		                    "Individual_Top_Wealth_Tie_Count",
+		                    each
+		                        let
+		                            GroupRows = _,
+		
+		                            MaximumWealth =
+		                                List.Max(
+		                                    List.RemoveNulls(
+		                                        GroupRows[net_worth_usd]
+		                                    )
+		                                ),
+		
+		                            TopRows =
+		                                Table.SelectRows(
+		                                    GroupRows,
+		                                    each
+		                                        [net_worth_usd]
+		                                        = MaximumWealth
+		                                )
+		                        in
+		                            Table.RowCount(TopRows),
+		                    Int64.Type
+		                }
+		            }
+		        ),
+		
+		    // =========================================
+		    // 3. SORT RESULTS
+		    // =========================================
+		
+		    SortedCountries =
+		        Table.Sort(
+		            GroupedByCountry,
+		            {{"iso3", Order.Ascending}}
+		        )
+		
 		in
-		  #"Grouped rows"
+		    SortedCountries
 	lineageTag: 6a1c777e-f4b0-467a-b480-7e45e2c573a8
 	queryGroup: '05_QA & Reconciliation'
 
@@ -411,11 +606,75 @@ expression qa_IndividualByCountry =
 
 expression qa_CountryAggregate =
 		let
-		  Source = stg_BillionaireCountry,
-		  #"Choose columns" = Table.SelectColumns(Source, {"country", "iso3", "billionaire_count", "total_wealth_usd"}),
-		  #"Renamed columns" = Table.RenameColumns(#"Choose columns", {{"billionaire_count", "Aggregate_Billionaire_Count"}, {"total_wealth_usd", "Aggregate_Total_Wealth_USD"}})
+		    Source =
+		        stg_BillionaireCountry,
+		
+		    // Keep only fields required for reconciliation
+		    SelectedColumns =
+		        Table.SelectColumns(
+		            Source,
+		            {
+		                "iso3",
+		                "country",
+		                "billionaire_count",
+		                "total_wealth_usd",
+		                "mean_wealth_usd_m",
+		                "median_wealth_usd_m",
+		                "max_wealth_usd_m",
+		                "self_made_count",
+		                "self_made_ratio_pct",
+		                "mean_age",
+		                "top_billionaire"
+		            }
+		        ),
+		
+		    // Prefix aggregate metrics to distinguish their origin
+		    RenamedColumns =
+		        Table.RenameColumns(
+		            SelectedColumns,
+		            {
+		                {"iso3", "Aggregate_ISO3"},
+		                {
+		                    "billionaire_count",
+		                    "Aggregate_Billionaire_Count"
+		                },
+		                {
+		                    "total_wealth_usd",
+		                    "Aggregate_Total_Wealth_USD"
+		                },
+		                {
+		                    "mean_wealth_usd_m",
+		                    "Aggregate_Mean_Wealth_USD_M"
+		                },
+		                {
+		                    "median_wealth_usd_m",
+		                    "Aggregate_Median_Wealth_USD_M"
+		                },
+		                {
+		                    "max_wealth_usd_m",
+		                    "Aggregate_Max_Wealth_USD_M"
+		                },
+		                {
+		                    "self_made_count",
+		                    "Aggregate_Self_Made_Count"
+		                },
+		                {
+		                    "self_made_ratio_pct",
+		                    "Aggregate_Self_Made_Ratio_Pct"
+		                },
+		                {
+		                    "mean_age",
+		                    "Aggregate_Mean_Age"
+		                },
+		                {
+		                    "top_billionaire",
+		                    "Aggregate_Top_Billionaire"
+		                }
+		            }
+		        )
+		
 		in
-		  #"Renamed columns"
+		    RenamedColumns
 	lineageTag: 2575957a-87cf-4319-bc76-2a954a26e115
 	queryGroup: '05_QA & Reconciliation'
 
@@ -423,24 +682,13 @@ expression qa_CountryAggregate =
 
 expression qa_CountryReconciliation =
 		let
-		  Source = Table.NestedJoin(qa_IndividualByCountry, {"iso3"}, qa_CountryAggregate, {"iso3"}, "qa_CountryAggregate", JoinKind.FullOuter),
-		  #"Expanded qa_CountryAggregate" = Table.ExpandTableColumn(Source, "qa_CountryAggregate", {"country", "iso3", "Aggregate_Billionaire_Count", "Aggregate_Total_Wealth_USD"}, {"country", "Aggregate_ISO3", "Aggregate_Billionaire_Count", "Aggregate_Total_Wealth_USD"}),
-		  #"Added custom" = Table.TransformColumnTypes(Table.AddColumn(#"Expanded qa_CountryAggregate", "Count_Difference", each [Individual_Billionaire_Count] - [Aggregate_Billionaire_Count]), {{"Count_Difference", Int64.Type}}),
-		  #"Added custom 1" = Table.TransformColumnTypes(Table.AddColumn(#"Added custom", "Wealth_Difference", each [Individual_Total_Wealth_USD] - [Aggregate_Total_Wealth_USD]), {{"Wealth_Difference", Int64.Type}}),
-		  #"Added custom 2" = Table.TransformColumnTypes(Table.AddColumn(#"Added custom 1", "Reconciliation_Status", each if [Individual_Billionaire_Count] = null then
-		    "Missing from individual data"
-		else if [Aggregate_Billionaire_Count] = null then
-		    "Missing from country aggregate"
-		else if [Count_Difference] <> 0 then
-		    "Count mismatch"
-		else if Number.Round([Wealth_Difference], 2) <> 0 then
-		    "Wealth mismatch"
-		else
-		    "Matched"), {{"Reconciliation_Status", type text}})
+		  Source = Table.NestedJoin(qa_IndividualByCountry, {"iso3"}, qa_CountryAggregate, {"iso3"}, "qa_CountryAggregate", JoinKind.FullOuter)
 		in
-		  #"Added custom 2"
+		  Source
 	lineageTag: d32e7f72-5fed-4135-aead-000444168561
 	queryGroup: '05_QA & Reconciliation'
+
+	annotation PBI_ResultType = Exception
 
 expression tmp_StagingValidation =
 		let
