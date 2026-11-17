@@ -25,145 +25,58 @@ table DimCountry
 
 		annotation SummarizationSetBy = Automatic
 
-	column gdp_usd
-		dataType: decimal
-		formatString: "AED"#,0.###############;-"AED"#,0.###############;"AED"#,0.###############
-		lineageTag: 7b5fcc9a-b3b3-4ed2-9ca9-b360fac773c9
-		summarizeBy: none
-		sourceColumn: gdp_usd
-
-		annotation SummarizationSetBy = Automatic
-
-		annotation PBI_FormatHint = {"currencyCulture":"en-AE"}
-
-	column population
-		dataType: int64
-		formatString: 0
-		lineageTag: 6409dc1c-1888-47f5-94ad-6ccfada874f2
-		summarizeBy: none
-		sourceColumn: population
-
-		annotation SummarizationSetBy = Automatic
-
-	column gdp_year
-		dataType: int64
-		formatString: 0
-		lineageTag: 2a882496-c51c-407a-8017-fffe7c28a94c
-		summarizeBy: none
-		sourceColumn: gdp_year
-
-		annotation SummarizationSetBy = Automatic
-
-	column source_country_wealth_rank
-		dataType: int64
-		formatString: 0
-		lineageTag: d596b1fe-a47f-48cc-891d-26a736707ba9
-		summarizeBy: none
-		sourceColumn: source_country_wealth_rank
-
-		annotation SummarizationSetBy = Automatic
-
-	column wealth_concentration_tier
-		dataType: string
-		lineageTag: 517fdc0d-208a-4e86-81ca-3240f58c4182
-		summarizeBy: none
-		sourceColumn: wealth_concentration_tier
-
-		annotation SummarizationSetBy = Automatic
-
-	column sector_dominance_score
-		dataType: double
-		lineageTag: 9f79c0b9-bd11-4dd5-b799-8055b6dd2394
-		summarizeBy: none
-		sourceColumn: sector_dominance_score
-
-		annotation SummarizationSetBy = Automatic
-
-		annotation PBI_FormatHint = {"isGeneralNumber":true}
-
-	column dominant_industry_by_wealth
-		dataType: string
-		lineageTag: a9cbf58a-f3cc-4573-9b32-25462371d106
-		summarizeBy: none
-		sourceColumn: dominant_industry_by_wealth
-
-		annotation SummarizationSetBy = Automatic
-
-	column snapshot_date
-		dataType: dateTime
-		formatString: Long Date
-		lineageTag: fad3ec7f-e9fe-4fd5-b77a-158c741df7bb
-		summarizeBy: none
-		sourceColumn: snapshot_date
-
-		annotation SummarizationSetBy = Automatic
-
-		annotation UnderlyingDateTimeDataType = Date
-
 	partition DimCountry = m
 		mode: import
 		queryGroup: 04_DataModel\Dimensions
 		source =
 				let
+				    // Reference validated country staging
 				    Source =
 				        stg_BillionaireCountry,
 				
+				    // Retain descriptive attributes only
 				    SelectedColumns =
 				        Table.SelectColumns(
 				            Source,
 				            {
 				                "iso3",
 				                "country",
-				                "wb_country_name",
-				                "gdp_usd",
-				                "population",
-				                "gdp_year",
-				                "country_wealth_rank",
-				                "wealth_concentration_tier",
-				                "sector_dominance_score",
-				                "dominant_industry_by_wealth"
+				                "wb_country_name"
 				            }
 				        ),
 				
-				    RenamedColumns =
-				        Table.RenameColumns(
+				    // Standardize country keys
+				    Standardized =
+				        Table.TransformColumns(
 				            SelectedColumns,
 				            {
 				                {
-				                    "country_wealth_rank",
-				                    "source_country_wealth_rank"
+				                    "iso3",
+				                    each if _ = null
+				                        then null
+				                        else Text.Upper(Text.Trim(_)),
+				                    type nullable text
 				                }
 				            }
 				        ),
 				
 				    ChangedTypes =
 				        Table.TransformColumnTypes(
-				            RenamedColumns,
+				            Standardized,
 				            {
-				                {"iso3", type text},
 				                {"country", type text},
-				                {"wb_country_name", type text},
-				                {"gdp_usd", Currency.Type},
-				                {"population", Int64.Type},
-				                {"gdp_year", Int64.Type},
-				                {"source_country_wealth_rank", Int64.Type},
-				                {"wealth_concentration_tier", type text},
-				                {"sector_dominance_score", type number},
-				                {"dominant_industry_by_wealth", type text}
-				            },
-				            "en-US"
+				                {"wb_country_name", type text}
+				            }
 				        ),
 				
-				    AddSnapshotDate =
-				        Table.AddColumn(
+				    SortedCountries =
+				        Table.Sort(
 				            ChangedTypes,
-				            "snapshot_date",
-				            each p_SnapshotDate,
-				            type date
+				            {{"country", Order.Ascending}}
 				        )
 				
 				in
-				    AddSnapshotDate
+				    SortedCountries
 
 	annotation PBI_ResultType = Table
 

@@ -1,0 +1,335 @@
+table FactCountrySnapshot
+	lineageTag: 0fe8e84e-b8f6-480c-9cc2-4ad768fd89b6
+
+	column iso3
+		dataType: string
+		lineageTag: af34ae36-1447-4ab8-81f7-23e87ca5ccd8
+		summarizeBy: none
+		sourceColumn: iso3
+
+		annotation SummarizationSetBy = Automatic
+
+	column country_wealth_rank
+		dataType: int64
+		formatString: 0
+		lineageTag: 69bcfb61-05c1-476c-beb1-f7ec7319ee1b
+		summarizeBy: sum
+		sourceColumn: country_wealth_rank
+
+		annotation SummarizationSetBy = Automatic
+
+	column billionaire_count
+		dataType: int64
+		formatString: 0
+		lineageTag: ac6812fb-21b4-4d1b-ac28-e04de514a1b0
+		summarizeBy: sum
+		sourceColumn: billionaire_count
+
+		annotation SummarizationSetBy = Automatic
+
+	column total_wealth_usd_m
+		dataType: decimal
+		formatString: "AED"#,0.###############;-"AED"#,0.###############;"AED"#,0.###############
+		lineageTag: 0cc81341-690f-422d-bf80-5c610f739f76
+		summarizeBy: sum
+		sourceColumn: total_wealth_usd_m
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"currencyCulture":"en-AE"}
+
+	column total_wealth_usd
+		dataType: decimal
+		formatString: "AED"#,0.###############;-"AED"#,0.###############;"AED"#,0.###############
+		lineageTag: e6a799f3-c084-4390-b614-98541b2a538f
+		summarizeBy: sum
+		sourceColumn: total_wealth_usd
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"currencyCulture":"en-AE"}
+
+	column mean_wealth_usd_m
+		dataType: double
+		lineageTag: 05ddbc04-4163-46dd-bfdb-b86f295654ba
+		summarizeBy: sum
+		sourceColumn: mean_wealth_usd_m
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column median_wealth_usd_m
+		dataType: double
+		lineageTag: c92fccc5-5c1b-40c7-8498-a790c0166e9b
+		summarizeBy: sum
+		sourceColumn: median_wealth_usd_m
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column max_wealth_usd_m
+		dataType: double
+		lineageTag: 063ef86c-b638-46cf-933a-3df60fe30489
+		summarizeBy: sum
+		sourceColumn: max_wealth_usd_m
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column top_billionaire
+		dataType: string
+		lineageTag: a6d02502-e741-4360-8716-7c5a8d4fdc82
+		summarizeBy: none
+		sourceColumn: top_billionaire
+
+		annotation SummarizationSetBy = Automatic
+
+	column dominant_industry_by_wealth
+		dataType: string
+		lineageTag: b1382ba6-902b-4c45-8b84-ff1a917fd148
+		summarizeBy: none
+		sourceColumn: dominant_industry_by_wealth
+
+		annotation SummarizationSetBy = Automatic
+
+	column self_made_count
+		dataType: int64
+		formatString: 0
+		lineageTag: 01afc0b7-3c1d-4a4f-8df4-c19c1c474db1
+		summarizeBy: sum
+		sourceColumn: self_made_count
+
+		annotation SummarizationSetBy = Automatic
+
+	column self_made_ratio_pct
+		dataType: double
+		lineageTag: 7ac1ab42-05df-4544-b92b-9cb8e3c54108
+		summarizeBy: sum
+		sourceColumn: self_made_ratio_pct
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column mean_age
+		dataType: double
+		lineageTag: 652a1e41-7c8e-4a33-a193-0d76357f745b
+		summarizeBy: sum
+		sourceColumn: mean_age
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column country_wealth_gdp_pct
+		dataType: double
+		lineageTag: 6203e9a2-8fbd-4f7e-b671-eff97955c756
+		summarizeBy: sum
+		sourceColumn: country_wealth_gdp_pct
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column billionaires_per_million_pop
+		dataType: double
+		lineageTag: 5e132158-038d-4b3a-b399-89e7dc4d2693
+		summarizeBy: sum
+		sourceColumn: billionaires_per_million_pop
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column wealth_concentration_tier
+		dataType: string
+		lineageTag: b5984acd-82d6-4e69-b54b-b68fccedbbb0
+		summarizeBy: none
+		sourceColumn: wealth_concentration_tier
+
+		annotation SummarizationSetBy = Automatic
+
+	column gdp_per_billionaire_bn
+		dataType: double
+		lineageTag: f3415246-34fc-4045-af44-d83ff6f2f961
+		summarizeBy: sum
+		sourceColumn: gdp_per_billionaire_bn
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column sector_dominance_score
+		dataType: double
+		lineageTag: 2f51e225-d009-4fc4-9674-2473d59120f3
+		summarizeBy: sum
+		sourceColumn: sector_dominance_score
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column gdp_usd
+		dataType: decimal
+		formatString: "AED"#,0.###############;-"AED"#,0.###############;"AED"#,0.###############
+		lineageTag: 4779c72c-3569-4b19-8d04-dde355e05f63
+		summarizeBy: sum
+		sourceColumn: gdp_usd
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"currencyCulture":"en-AE"}
+
+	column population
+		dataType: int64
+		formatString: 0
+		lineageTag: a0123d07-064b-45d6-bdd7-c8364c714830
+		summarizeBy: sum
+		sourceColumn: population
+
+		annotation SummarizationSetBy = Automatic
+
+	column gdp_year
+		dataType: int64
+		formatString: 0
+		lineageTag: 834b8014-cf97-4f3d-9f64-74221e7b3dcd
+		summarizeBy: sum
+		sourceColumn: gdp_year
+
+		annotation SummarizationSetBy = Automatic
+
+	column snapshot_date
+		dataType: dateTime
+		formatString: Long Date
+		lineageTag: 8c3f3b74-3031-4fc6-a4c5-c55be2035853
+		summarizeBy: none
+		sourceColumn: snapshot_date
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation UnderlyingDateTimeDataType = Date
+
+	partition FactCountrySnapshot = m
+		mode: import
+		queryGroup: 04_DataModel\Facts
+		source =
+				let
+				    // =========================================
+				    // 1. SOURCE
+				    // =========================================
+				
+				    Source =
+				        stg_BillionaireCountry,
+				
+				    // =========================================
+				    // 2. SELECT COUNTRY-LEVEL FACT COLUMNS
+				    // =========================================
+				
+				    SelectedColumns =
+				        Table.SelectColumns(
+				            Source,
+				            {
+				                "iso3",
+				                "country_wealth_rank",
+				                "billionaire_count",
+				                "total_wealth_usd_m",
+				                "total_wealth_usd",
+				                "mean_wealth_usd_m",
+				                "median_wealth_usd_m",
+				                "max_wealth_usd_m",
+				                "top_billionaire",
+				                "dominant_industry_by_wealth",
+				                "self_made_count",
+				                "self_made_ratio_pct",
+				                "mean_age",
+				                "country_wealth_gdp_pct",
+				                "billionaires_per_million_pop",
+				                "wealth_concentration_tier",
+				                "gdp_per_billionaire_bn",
+				                "sector_dominance_score",
+				                "gdp_usd",
+				                "population",
+				                "gdp_year"
+				            }
+				        ),
+				
+				    // =========================================
+				    // 3. STANDARDIZE COUNTRY KEY
+				    // =========================================
+				
+				    StandardizedISO3 =
+				        Table.TransformColumns(
+				            SelectedColumns,
+				            {
+				                {
+				                    "iso3",
+				                    each if _ = null
+				                        then null
+				                        else Text.Upper(Text.Trim(_)),
+				                    type nullable text
+				                }
+				            }
+				        ),
+				
+				    // =========================================
+				    // 4. APPLY DATA TYPES
+				    // =========================================
+				
+				    ChangedTypes =
+				        Table.TransformColumnTypes(
+				            StandardizedISO3,
+				            {
+				                {"country_wealth_rank", Int64.Type},
+				                {"billionaire_count", Int64.Type},
+				                {"total_wealth_usd_m", Currency.Type},
+				                {"total_wealth_usd", Currency.Type},
+				                {"mean_wealth_usd_m", type number},
+				                {"median_wealth_usd_m", type number},
+				                {"max_wealth_usd_m", type number},
+				                {"top_billionaire", type text},
+				                {"dominant_industry_by_wealth", type text},
+				                {"self_made_count", Int64.Type},
+				                {"self_made_ratio_pct", type number},
+				                {"mean_age", type number},
+				                {"country_wealth_gdp_pct", type number},
+				                {"billionaires_per_million_pop", type number},
+				                {"wealth_concentration_tier", type text},
+				                {"gdp_per_billionaire_bn", type number},
+				                {"sector_dominance_score", type number},
+				                {"gdp_usd", Currency.Type},
+				                {"population", Int64.Type},
+				                {"gdp_year", Int64.Type}
+				            },
+				            "en-US"
+				        ),
+				
+				    // =========================================
+				    // 5. ADD SNAPSHOT DATE
+				    // =========================================
+				
+				    AddSnapshotDate =
+				        Table.AddColumn(
+				            ChangedTypes,
+				            "snapshot_date",
+				            each p_SnapshotDate,
+				            type date
+				        ),
+				
+				    // =========================================
+				    // 6. SORT FOR INSPECTION
+				    // =========================================
+				
+				    SortedCountries =
+				        Table.Sort(
+				            AddSnapshotDate,
+				            {
+				                {"country_wealth_rank", Order.Ascending}
+				            }
+				        )
+				
+				in
+				    SortedCountries
+

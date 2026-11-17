@@ -10,21 +10,21 @@
       "nodes": [
         {
           "location": {
-            "x": 618.38305001469371,
-            "y": -50.000000000000028
+            "x": 334.17941566988634,
+            "y": 188.76878482936888
           },
           "nodeIndex": "DimCountry",
           "nodeLineageTag": "24f7a030-b074-4bc9-b534-2a428f49b5a0",
           "size": {
-            "height": 300,
+            "height": 152,
             "width": 234
           },
           "zIndex": 1
         },
         {
           "location": {
-            "x": 50,
-            "y": 77.9851107795993
+            "x": 902.57687716578,
+            "y": -50
           },
           "nodeIndex": "DimIndustry",
           "nodeLineageTag": "a609546e-2f1e-4d00-b955-e349e4f85366",
@@ -36,8 +36,8 @@
         },
         {
           "location": {
-            "x": 334.20156119318523,
-            "y": -17.155302040154083
+            "x": 618.37645520037074,
+            "y": -33.12876569283651
           },
           "nodeIndex": "FactBillionaire",
           "nodeLineageTag": "e4cc27ea-3d37-4f2f-acc6-7b818b3f374c",
@@ -49,8 +49,8 @@
         },
         {
           "location": {
-            "x": 852.38305001469371,
-            "y": 114.42234897992296
+            "x": 1136.57687716578,
+            "y": 241.04354838270621
           },
           "nodeIndex": "_Measures",
           "nodeLineageTag": "ec38b7b9-fed5-46c7-91d2-e613b5003b5f",
@@ -59,10 +59,23 @@
             "width": 234
           },
           "zIndex": 0
+        },
+        {
+          "location": {
+            "x": 50,
+            "y": 260.08709676541241
+          },
+          "nodeIndex": "FactCountrySnapshot",
+          "nodeLineageTag": "0fe8e84e-b8f6-480c-9cc2-4ad768fd89b6",
+          "size": {
+            "height": 300,
+            "width": 234
+          },
+          "zIndex": 0
         }
       ],
       "name": "All tables",
-      "zoomValue": 75.542931455498348,
+      "zoomValue": 61.424056489724677,
       "pinKeyFieldsToTop": false,
       "showExtraHeaderInfo": false,
       "hideKeyFieldsWhenCollapsed": false,

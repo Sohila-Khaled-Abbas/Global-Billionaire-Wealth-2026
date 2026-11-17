@@ -6,3 +6,9 @@ relationship 7a569156-4479-cb23-7880-4b83f6b8fe50
 	fromColumn: FactBillionaire.industry
 	toColumn: DimIndustry.industry
 
+relationship AutoDetected_45959e1c-e7a3-45d2-842b-7d4584544629
+	crossFilteringBehavior: bothDirections
+	fromCardinality: one
+	fromColumn: FactCountrySnapshot.iso3
+	toColumn: DimCountry.iso3
+

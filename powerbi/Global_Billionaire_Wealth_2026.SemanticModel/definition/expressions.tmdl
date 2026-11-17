@@ -3909,3 +3909,151 @@ expression tmp_FactBillionaireValidation =
 
 	annotation PBI_ResultType = Table
 
+expression tmp_FactCountrySnapshotValidation =
+		let
+		    Source =
+		        FactCountrySnapshot,
+		
+		    // =========================================
+		    // COUNTRY KEY VALIDATION
+		    // =========================================
+		
+		    ISO3Values =
+		        List.RemoveNulls(Source[iso3]),
+		
+		    DistinctISO3 =
+		        List.Distinct(ISO3Values),
+		
+		    ValidISO3 =
+		        List.Distinct(DimCountry[iso3]),
+		
+		    UnknownCountries =
+		        List.Difference(
+		            DistinctISO3,
+		            ValidISO3
+		        ),
+		
+		    // =========================================
+		    // BUSINESS METRIC VALIDATION
+		    // =========================================
+		
+		    TotalBillionaires =
+		        List.Sum(Source[billionaire_count]),
+		
+		    InvalidGDP =
+		        Table.RowCount(
+		            Table.SelectRows(
+		                Source,
+		                each [gdp_usd] = null
+		                    or [gdp_usd] <= 0
+		            )
+		        ),
+		
+		    InvalidPopulation =
+		        Table.RowCount(
+		            Table.SelectRows(
+		                Source,
+		                each [population] = null
+		                    or [population] <= 0
+		            )
+		        ),
+		
+		    // =========================================
+		    // INDUSTRY CLASSIFICATION VALIDATION
+		    // =========================================
+		
+		    DominantIndustries =
+		        List.Distinct(
+		            List.RemoveNulls(
+		                Source[dominant_industry_by_wealth]
+		            )
+		        ),
+		
+		    ValidIndustries =
+		        List.Distinct(DimIndustry[industry]),
+		
+		    UnknownIndustries =
+		        List.Difference(
+		            DominantIndustries,
+		            ValidIndustries
+		        ),
+		
+		    // =========================================
+		    // OUTPUT
+		    // =========================================
+		
+		    Result =
+		        #table(
+		            type table [
+		                Check = text,
+		                Actual = number,
+		                Expected = number,
+		                Status = text
+		            ],
+		            {
+		                {
+		                    "Snapshot rows",
+		                    Table.RowCount(Source),
+		                    80,
+		                    if Table.RowCount(Source) = 80
+		                    then "Passed" else "Investigate"
+		                },
+		                {
+		                    "Distinct country keys",
+		                    List.Count(DistinctISO3),
+		                    80,
+		                    if List.Count(DistinctISO3) = 80
+		                    then "Passed" else "Investigate"
+		                },
+		                {
+		                    "Missing country keys",
+		                    Table.RowCount(Source)
+		                        - List.Count(ISO3Values),
+		                    0,
+		                    if Table.RowCount(Source)
+		                        = List.Count(ISO3Values)
+		                    then "Passed" else "Investigate"
+		                },
+		                {
+		                    "Unmatched country keys",
+		                    List.Count(UnknownCountries),
+		                    0,
+		                    if List.IsEmpty(UnknownCountries)
+		                    then "Passed" else "Investigate"
+		                },
+		                {
+		                    "Total billionaire count",
+		                    TotalBillionaires,
+		                    3384,
+		                    if TotalBillionaires = 3384
+		                    then "Passed" else "Investigate"
+		                },
+		                {
+		                    "Invalid GDP",
+		                    InvalidGDP,
+		                    0,
+		                    if InvalidGDP = 0
+		                    then "Passed" else "Investigate"
+		                },
+		                {
+		                    "Invalid population",
+		                    InvalidPopulation,
+		                    0,
+		                    if InvalidPopulation = 0
+		                    then "Passed" else "Investigate"
+		                },
+		                {
+		                    "Unmatched dominant industries",
+		                    List.Count(UnknownIndustries),
+		                    0,
+		                    if List.IsEmpty(UnknownIndustries)
+		                    then "Passed" else "Investigate"
+		                }
+		            }
+		        )
+		
+		in
+		    Result
+	lineageTag: 2eaffd0d-2848-4f5a-a6b7-6db54911a890
+	queryGroup: 99_Archive
+
