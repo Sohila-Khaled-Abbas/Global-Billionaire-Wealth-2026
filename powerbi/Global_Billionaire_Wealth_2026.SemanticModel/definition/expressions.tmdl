@@ -4339,3 +4339,178 @@ expression tmp_GalaxyFactReconciliationSummary =
 	lineageTag: 29ce192b-d4bf-44d7-b641-c4f9f17086c9
 	queryGroup: 99_Archive
 
+expression tmp_SourceSchemaContract =
+		let
+		    // ================================================
+		    // 1. EXPECTED INDIVIDUAL SOURCE SCHEMA (25 columns)
+		    // ================================================
+		
+		    ExpectedIndividualColumns = {
+		        "rank",
+		        "person_name",
+		        "gender",
+		        "age",
+		        "birth_year",
+		        "country",
+		        "iso3",
+		        "wb_country_name",
+		        "state",
+		        "city",
+		        "net_worth_usd_m",
+		        "net_worth_usd",
+		        "source_of_wealth",
+		        "industries",
+		        "primary_industry",
+		        "self_made",
+		        "wealth_gdp_ratio_pct",
+		        "wealth_per_citizen_usd",
+		        "wealth_country_share_pct",
+		        "sector_dominance_score",
+		        "gdp_usd",
+		        "population",
+		        "gdp_year",
+		        "forbes_uri",
+		        "scrape_timestamp"
+		    },
+		
+		    // ================================================
+		    // 2. EXPECTED COUNTRY SOURCE SCHEMA (23 columns)
+		    // ================================================
+		
+		    ExpectedCountryColumns = {
+		        "country_wealth_rank",
+		        "country",
+		        "iso3",
+		        "wb_country_name",
+		        "billionaire_count",
+		        "total_wealth_usd_m",
+		        "total_wealth_usd",
+		        "mean_wealth_usd_m",
+		        "median_wealth_usd_m",
+		        "max_wealth_usd_m",
+		        "top_billionaire",
+		        "dominant_industry_by_wealth",
+		        "self_made_count",
+		        "self_made_ratio_pct",
+		        "mean_age",
+		        "country_wealth_gdp_pct",
+		        "billionaires_per_million_pop",
+		        "wealth_concentration_tier",
+		        "gdp_per_billionaire_bn",
+		        "sector_dominance_score",
+		        "gdp_usd",
+		        "population",
+		        "gdp_year"
+		    },
+		
+		    // ================================================
+		    // 3. GET ACTUAL SOURCE COLUMN NAMES
+		    // ================================================
+		
+		    ActualIndividualColumns =
+		        Table.ColumnNames(src_BillionaireIndividual),
+		
+		    ActualCountryColumns =
+		        Table.ColumnNames(src_BillionaireCountry),
+		
+		    // ================================================
+		    // 4. COMPARE EXPECTED VS ACTUAL SCHEMA
+		    // ================================================
+		
+		    MissingIndividualColumns =
+		        List.Difference(
+		            ExpectedIndividualColumns,
+		            ActualIndividualColumns
+		        ),
+		
+		    UnexpectedIndividualColumns =
+		        List.Difference(
+		            ActualIndividualColumns,
+		            ExpectedIndividualColumns
+		        ),
+		
+		    MissingCountryColumns =
+		        List.Difference(
+		            ExpectedCountryColumns,
+		            ActualCountryColumns
+		        ),
+		
+		    UnexpectedCountryColumns =
+		        List.Difference(
+		            ActualCountryColumns,
+		            ExpectedCountryColumns
+		        ),
+		
+		    // ================================================
+		    // 5. BUILD AUDIT OUTPUT
+		    // ================================================
+		
+		    Result =
+		        #table(
+		            type table [
+		                Source = text,
+		                Expected_Columns = Int64.Type,
+		                Actual_Columns = Int64.Type,
+		                Missing_Columns = text,
+		                Unexpected_Columns = text,
+		                Status = text
+		            ],
+		            {
+		                {
+		                    "src_BillionaireIndividual",
+		                    List.Count(ExpectedIndividualColumns),
+		                    List.Count(ActualIndividualColumns),
+		
+		                    if List.IsEmpty(MissingIndividualColumns)
+		                    then "None"
+		                    else Text.Combine(
+		                        MissingIndividualColumns,
+		                        ", "
+		                    ),
+		
+		                    if List.IsEmpty(UnexpectedIndividualColumns)
+		                    then "None"
+		                    else Text.Combine(
+		                        UnexpectedIndividualColumns,
+		                        ", "
+		                    ),
+		
+		                    if
+		                        List.IsEmpty(MissingIndividualColumns)
+		                        and List.IsEmpty(UnexpectedIndividualColumns)
+		                    then "Passed"
+		                    else "Investigate"
+		                },
+		
+		                {
+		                    "src_BillionaireCountry",
+		                    List.Count(ExpectedCountryColumns),
+		                    List.Count(ActualCountryColumns),
+		
+		                    if List.IsEmpty(MissingCountryColumns)
+		                    then "None"
+		                    else Text.Combine(
+		                        MissingCountryColumns,
+		                        ", "
+		                    ),
+		
+		                    if List.IsEmpty(UnexpectedCountryColumns)
+		                    then "None"
+		                    else Text.Combine(
+		                        UnexpectedCountryColumns,
+		                        ", "
+		                    ),
+		
+		                    if
+		                        List.IsEmpty(MissingCountryColumns)
+		                        and List.IsEmpty(UnexpectedCountryColumns)
+		                    then "Passed"
+		                    else "Investigate"
+		                }
+		            }
+		        )
+		in
+		    Result
+	lineageTag: 43cf9d3e-82df-40d0-809f-cf21dc1136c4
+	queryGroup: 99_Archive
+
