@@ -1,0 +1,65 @@
+table DimIndustry
+	lineageTag: a609546e-2f1e-4d00-b955-e349e4f85366
+
+	column industry
+		dataType: string
+		lineageTag: 25ac1aab-cdee-476f-b22c-390e91747128
+		summarizeBy: none
+		sourceColumn: industry
+
+		annotation SummarizationSetBy = Automatic
+
+	partition DimIndustry = m
+		mode: import
+		queryGroup: 04_DataModel\Dimensions
+		source =
+				let
+				    // Reference validated industry lookup
+				    Source =
+				        int_IndustryLookup,
+				
+				    // Keep the natural industry key
+				    SelectedColumns =
+				        Table.SelectColumns(
+				            Source,
+				            {"industry"}
+				        ),
+				
+				    // Reapply consistent text standardization
+				    Standardized =
+				        Table.TransformColumns(
+				            SelectedColumns,
+				            {
+				                {
+				                    "industry",
+				                    fn_StandardizeCountry,
+				                    type nullable text
+				                }
+				            }
+				        ),
+				
+				    // Remove invalid labels
+				    ValidIndustries =
+				        Table.SelectRows(
+				            Standardized,
+				            each
+				                [industry] <> null
+				                and [industry] <> ""
+				        ),
+				
+				    // Enforce uniqueness
+				    DistinctIndustries =
+				        Table.Distinct(
+				            ValidIndustries,
+				            {"industry"}
+				        ),
+				
+				    // Alphabetical sorting
+				    SortedIndustries =
+				        Table.Sort(
+				            DistinctIndustries,
+				            {{"industry", Order.Ascending}}
+				        )
+				in
+				    SortedIndustries
+
