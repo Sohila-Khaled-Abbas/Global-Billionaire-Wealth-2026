@@ -5177,3 +5177,233 @@ expression tmp_FinalFactGrainValidation =
 	lineageTag: ff111ad1-e7a7-43c2-89b8-de299df506ca
 	queryGroup: 99_Archive
 
+expression fn_CleanText =
+		(value as nullable text) as nullable text =>
+		let
+		    Result =
+		        if value = null then
+		            null
+		        else
+		            let
+		                ReplaceNBSP =
+		                    Text.Replace(
+		                        value,
+		                        Character.FromNumber(160),
+		                        " "
+		                    ),
+		
+		                Cleaned =
+		                    Text.Clean(ReplaceNBSP),
+		
+		                Trimmed =
+		                    Text.Trim(Cleaned),
+		
+		                Words =
+		                    if Trimmed = "" then
+		                        {}
+		                    else
+		                        List.Select(
+		                            Text.Split(Trimmed, " "),
+		                            each _ <> ""
+		                        ),
+		
+		                Standardized =
+		                    if List.IsEmpty(Words) then
+		                        null
+		                    else
+		                        Text.Combine(Words, " ")
+		            in
+		                Standardized
+		in
+		    Result
+	lineageTag: 8a8387dc-cb2c-48f7-bb87-3a65ba490ded
+	queryGroup: '00_Parameters & Functions'
+
+	annotation PBI_ResultType = Function
+
+expression fn_NormalizeISO3 =
+		(code as nullable text) as nullable text =>
+		let
+		    Cleaned =
+		        fn_CleanText(code),
+		
+		    Normalized =
+		        if Cleaned = null then
+		            null
+		        else
+		            Text.Upper(Cleaned)
+		in
+		    Normalized
+	lineageTag: bd74abba-dccf-4b3e-8ee2-6020771ba82d
+	queryGroup: '00_Parameters & Functions'
+
+expression fn_SafeDivide =
+		(
+		    Numerator as nullable number,
+		    Denominator as nullable number,
+		    optional Multiplier as nullable number
+		)
+		as nullable number =>
+		
+		let
+		    Scale =
+		        if Multiplier = null then
+		            1
+		        else
+		            Multiplier,
+		
+		    Result =
+		        if
+		            Numerator = null
+		            or Denominator = null
+		            or Denominator = 0
+		        then
+		            null
+		        else
+		            Numerator / Denominator * Scale
+		in
+		    Result
+	lineageTag: 3cb59619-78d4-4576-88d3-9042d006475c
+	queryGroup: '00_Parameters & Functions'
+
+expression tmp_FunctionLibraryValidation =
+		let
+		    // ================================================
+		    // TEXT CLEANING TESTS
+		    // ================================================
+		
+		    TextCase1 =
+		        fn_CleanText("  United  States  "),
+		
+		    TextCase2 =
+		        fn_CleanText(
+		            "Hong" &
+		            Character.FromNumber(160) &
+		            "Kong"
+		        ),
+		
+		    TextCase3 =
+		        fn_CleanText("   "),
+		
+		    TextCase4 =
+		        fn_CleanText("mACROsoft"),
+		
+		    // ================================================
+		    // ISO3 NORMALIZATION TESTS
+		    // ================================================
+		
+		    ISOCase1 =
+		        fn_NormalizeISO3(" usa "),
+		
+		    ISOCase2 =
+		        fn_NormalizeISO3("Twn"),
+		
+		    ISOCase3 =
+		        fn_NormalizeISO3(null),
+		
+		    // ================================================
+		    // SAFE DIVISION TESTS
+		    // ================================================
+		
+		    DivideCase1 =
+		        fn_SafeDivide(100, 25),
+		
+		    DivideCase2 =
+		        fn_SafeDivide(100, 25, 100),
+		
+		    DivideCase3 =
+		        fn_SafeDivide(100, 0),
+		
+		    // ================================================
+		    // BUILD TEST RESULTS
+		    // ================================================
+		
+		    Tests =
+		        #table(
+		            type table [
+		                Function = text,
+		                Test = text,
+		                Actual = text,
+		                Expected = text
+		            ],
+		            {
+		                {
+		                    "fn_CleanText",
+		                    "Trim and collapse spaces",
+		                    TextCase1,
+		                    "United States"
+		                },
+		                {
+		                    "fn_CleanText",
+		                    "Replace non-breaking space",
+		                    TextCase2,
+		                    "Hong Kong"
+		                },
+		                {
+		                    "fn_CleanText",
+		                    "Convert blank to null",
+		                    if TextCase3 = null then "<null>" else TextCase3,
+		                    "<null>"
+		                },
+		                {
+		                    "fn_CleanText",
+		                    "Preserve original casing",
+		                    TextCase4,
+		                    "mACROsoft"
+		                },
+		                {
+		                    "fn_NormalizeISO3",
+		                    "Uppercase and trim ISO3",
+		                    ISOCase1,
+		                    "USA"
+		                },
+		                {
+		                    "fn_NormalizeISO3",
+		                    "Normalize lowercase code",
+		                    ISOCase2,
+		                    "TWN"
+		                },
+		                {
+		                    "fn_NormalizeISO3",
+		                    "Preserve null",
+		                    if ISOCase3 = null then "<null>" else ISOCase3,
+		                    "<null>"
+		                },
+		                {
+		                    "fn_SafeDivide",
+		                    "Basic division",
+		                    Number.ToText(DivideCase1, "0.####", "en-US"),
+		                    "4"
+		                },
+		                {
+		                    "fn_SafeDivide",
+		                    "Division with percentage multiplier",
+		                    Number.ToText(DivideCase2, "0.####", "en-US"),
+		                    "400"
+		                },
+		                {
+		                    "fn_SafeDivide",
+		                    "Zero denominator",
+		                    if DivideCase3 = null
+		                    then "<null>"
+		                    else Number.ToText(DivideCase3),
+		                    "<null>"
+		                }
+		            }
+		        ),
+		
+		    AddStatus =
+		        Table.AddColumn(
+		            Tests,
+		            "Status",
+		            each
+		                if [Actual] = [Expected]
+		                then "Passed"
+		                else "Investigate",
+		            type text
+		        )
+		in
+		    AddStatus
+	lineageTag: bbb3ee00-23ea-4290-b208-9523cac83df7
+	queryGroup: 99_Archive
+
