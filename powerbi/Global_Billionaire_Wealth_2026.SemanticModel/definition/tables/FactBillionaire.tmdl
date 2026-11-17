@@ -1,0 +1,223 @@
+table FactBillionaire
+	lineageTag: e4cc27ea-3d37-4f2f-acc6-7b818b3f374c
+
+	column rank
+		dataType: int64
+		formatString: 0
+		lineageTag: e5645668-811e-4355-b540-fd7d2ea58c05
+		summarizeBy: sum
+		sourceColumn: rank
+
+		annotation SummarizationSetBy = Automatic
+
+	column person_name
+		dataType: string
+		lineageTag: b622c776-ec73-493b-9586-bc3d1da476c6
+		summarizeBy: none
+		sourceColumn: person_name
+
+		annotation SummarizationSetBy = Automatic
+
+	column gender
+		dataType: string
+		lineageTag: 86e24841-9a59-4a98-9101-b73bf0b2e318
+		summarizeBy: none
+		sourceColumn: gender
+
+		annotation SummarizationSetBy = Automatic
+
+	column age
+		dataType: int64
+		formatString: 0
+		lineageTag: ac6a98ae-98cf-43cb-a96b-fa4b1d3e9da1
+		summarizeBy: sum
+		sourceColumn: age
+
+		annotation SummarizationSetBy = Automatic
+
+	column iso3
+		dataType: string
+		lineageTag: 8521003f-37e7-48c8-9c54-d4d8a3a81da5
+		summarizeBy: none
+		sourceColumn: iso3
+
+		annotation SummarizationSetBy = Automatic
+
+	column state
+		dataType: string
+		lineageTag: 4eb895cb-85af-4625-bb14-2b056838b859
+		summarizeBy: none
+		sourceColumn: state
+
+		annotation SummarizationSetBy = Automatic
+
+	column city
+		dataType: string
+		lineageTag: 0e9e0245-15d7-41e8-91bb-a0eae1c007f2
+		summarizeBy: none
+		sourceColumn: city
+
+		annotation SummarizationSetBy = Automatic
+
+	column net_worth_usd
+		dataType: decimal
+		lineageTag: cd484e7c-0030-451c-9660-7315fb10fbc9
+		summarizeBy: sum
+		sourceColumn: net_worth_usd
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column source_of_wealth
+		dataType: string
+		lineageTag: 995f3334-fcb4-4e30-a9d3-3d1cb17eb449
+		summarizeBy: none
+		sourceColumn: source_of_wealth
+
+		annotation SummarizationSetBy = Automatic
+
+	column industry
+		dataType: string
+		lineageTag: 3f200cbc-4cf9-4f0c-9289-67bc38cd0943
+		summarizeBy: none
+		sourceColumn: industry
+
+		annotation SummarizationSetBy = Automatic
+
+	column self_made
+		dataType: boolean
+		formatString: """TRUE"";""TRUE"";""FALSE"""
+		lineageTag: a9bf7a1e-c360-4bda-bbd4-6f3d3e9e2728
+		summarizeBy: none
+		sourceColumn: self_made
+
+		annotation SummarizationSetBy = Automatic
+
+	column forbes_uri
+		dataType: string
+		lineageTag: 7eeec3ca-c438-4221-8e2d-1148566e1f3f
+		summarizeBy: none
+		sourceColumn: forbes_uri
+
+		annotation SummarizationSetBy = Automatic
+
+	column scrape_timestamp
+		dataType: dateTime
+		formatString: General Date
+		lineageTag: a5cf5eb1-1224-4e3a-9d3e-009c40c06e95
+		summarizeBy: none
+		sourceColumn: scrape_timestamp
+
+		annotation SummarizationSetBy = Automatic
+
+	column birth_year
+		dataType: int64
+		formatString: 0
+		lineageTag: 9303fe32-9801-47a5-966a-4005233ac99d
+		summarizeBy: sum
+		sourceColumn: birth_year
+
+		annotation SummarizationSetBy = Automatic
+
+	column snapshot_date
+		dataType: dateTime
+		formatString: Long Date
+		lineageTag: 1dc487dc-7877-46b4-8f1d-5135e99268c9
+		summarizeBy: none
+		sourceColumn: snapshot_date
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation UnderlyingDateTimeDataType = Date
+
+	partition FactBillionaire = m
+		mode: import
+		queryGroup: 04_DataModel\Facts
+		source =
+				let
+				    // =========================================
+				    // 1. REFERENCE VALIDATED STAGING TABLE
+				    // =========================================
+				
+				    Source =
+				        stg_BillionaireIndividual,
+				
+				    // =========================================
+				    // 2. SELECT INDIVIDUAL-LEVEL FIELDS
+				    // =========================================
+				
+				    SelectedColumns =
+				        Table.SelectColumns(
+				            Source,
+				            {
+				                "forbes_uri",
+				                "rank",
+				                "person_name",
+				                "iso3",
+				                "gender",
+				                "age",
+				                "birth_year",
+				                "state",
+				                "city",
+				                "net_worth_usd",
+				                "source_of_wealth",
+				                "primary_industry",
+				                "self_made",
+				                "scrape_timestamp"
+				            }
+				        ),
+				
+				    // =========================================
+				    // 3. RENAME INDUSTRY FOREIGN KEY
+				    // =========================================
+				
+				    RenamedColumns =
+				        Table.RenameColumns(
+				            SelectedColumns,
+				            {
+				                {"primary_industry", "industry"}
+				            }
+				        ),
+				
+				    // =========================================
+				    // 4. APPLY SEMANTIC MODEL DATA TYPES
+				    // =========================================
+				
+				    ChangedTypes =
+				        Table.TransformColumnTypes(
+				            RenamedColumns,
+				            {
+				                {"forbes_uri", type text},
+				                {"rank", Int64.Type},
+				                {"person_name", type text},
+				                {"iso3", type text},
+				                {"gender", type text},
+				                {"age", Int64.Type},
+				                {"birth_year", Int64.Type},
+				                {"state", type text},
+				                {"city", type text},
+				                {"net_worth_usd", Currency.Type},
+				                {"source_of_wealth", type text},
+				                {"industry", type text},
+				                {"self_made", type logical},
+				                {"scrape_timestamp", type datetimezone}
+				            },
+				            "en-US"
+				        ),
+				
+				    // =========================================
+				    // 5. ADD SNAPSHOT DATE
+				    // =========================================
+				
+				    AddSnapshotDate =
+				        Table.AddColumn(
+				            ChangedTypes,
+				            "snapshot_date",
+				            each p_SnapshotDate,
+				            type date
+				        )
+				
+				in
+				    AddSnapshotDate
+

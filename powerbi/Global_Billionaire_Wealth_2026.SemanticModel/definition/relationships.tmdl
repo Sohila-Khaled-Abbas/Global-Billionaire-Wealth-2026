@@ -1,0 +1,4 @@
+relationship AutoDetected_1eb8a740-eaba-40e9-8d82-43fa40c3d43a
+	fromColumn: FactBillionaire.iso3
+	toColumn: DimCountry.iso3
+
