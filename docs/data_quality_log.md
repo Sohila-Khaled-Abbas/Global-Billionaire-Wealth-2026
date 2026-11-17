@@ -68,3 +68,14 @@ The dataset retains 4 high-profile historical billionaires whose fortunes collap
 2. **Reconciliation Formula**:
    $$\sum \text{FactBillionaire}[net\_worth\_usd] = \sum \text{FactCountrySnapshot}[total\_wealth\_usd] = \$19,639,549,700,000\text{ USD}$$
    The balance sheet reconciles to the exact penny ($0.00 delta).
+
+---
+
+## 4. Macroeconomic Vintage & Historical-Vintage Exceptions
+
+Country-level GDP and population values use the most recent available source data incorporated into the April 10, 2026 analytical snapshot. GDP reference years vary by country. Liechtenstein has a 2022 GDP observation and is retained as a documented historical-vintage exception pending source-level verification. Original source values are preserved to maintain reproducibility.
+
+| Country | ISO3 | GDP Reference Year | GDP (USD) | Population | Billionaire Wealth ($M) | Treatment |
+| :--- | :---: | :---: | :---: | :---: | :---: | :--- |
+| **Liechtenstein** | `LIE` | 2022 | \$7.79 Billion | 39,584 | \$1,362.00 | Documented historical-vintage exception; preserved as-is. |
+| **All Other Nations (79)** | Various | 2023 / 2024 | Standard World Bank | Standard World Bank | Standard Forbes | Standard baseline. |

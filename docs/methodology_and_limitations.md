@@ -15,7 +15,7 @@ The analytics platform merges two independent authoritative tiers of financial a
 
 2. **Macroeconomic Tier**:
    - **Source**: World Bank Open Data Repository (Indicators: `NY.GDP.MKTP.CD` for Nominal GDP in current USD, `SP.POP.TOTL` for Total Population).
-   - **Temporal Window**: Baseline years 2023–2024 (most recent verified standardized national accounts).
+   - **Temporal Window**: Baseline years 2022–2024. Country-level GDP and population values use the most recent available source data incorporated into the April 10, 2026 analytical snapshot. GDP reference years vary by country. Liechtenstein has a 2022 GDP observation and is retained as a documented historical-vintage exception pending source-level verification. Original source values are preserved to maintain reproducibility.
    - **Standardization**: Country names reconciled against ISO 3166-1 alpha-3 codes (`DimCountry.iso3`).
 
 ---
@@ -71,3 +71,6 @@ $$\text{Self-Made Ratio \%} = \left( \frac{\text{Count of Self-Made Billionaires
 
 5. **Survivorship Bias**:
    - The dataset evaluates entities crossing the \$1 Billion threshold. It inherently excludes high-net-worth individuals possessing \$500M–\$999M, creating an artificial discontinuity at the floor.
+
+6. **Macroeconomic Reference Windows & Vintage Variance**:
+   - Country-level GDP and population values use the most recent available source data incorporated into the April 10, 2026 analytical snapshot. GDP reference years vary by country. Liechtenstein has a 2022 GDP observation and is retained as a documented historical-vintage exception pending source-level verification. Original source values are preserved to maintain reproducibility.

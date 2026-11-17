@@ -111,7 +111,7 @@ The analytical model implements a Kimball-style dimensional architecture (Star/S
 | `sector_dominance_score` | Double | Decimal Number | No | Share of national billionaire wealth held in the single leading sector (%). |
 | `gdp_usd` | Decimal | Currency | No | Annual nominal GDP in US Dollars from World Bank. |
 | `population` | Int64 | Whole Number | No | Total national population from World Bank. |
-| `gdp_year` | Int64 | Whole Number | No | Baseline year of national GDP indicator (2023 or 2024). |
+| `gdp_year` | Int64 | Whole Number | No | Baseline year of national GDP indicator. Country-level GDP and population values use the most recent available source data incorporated into the April 10, 2026 analytical snapshot. GDP reference years vary by country. Liechtenstein has a 2022 GDP observation and is retained as a documented historical-vintage exception pending source-level verification. Original source values are preserved to maintain reproducibility. |
 | `snapshot_date` | DateTime (Date) | Date | No | Analytical snapshot date (`p_SnapshotDate`). |
 
 ---

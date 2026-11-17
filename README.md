@@ -319,6 +319,9 @@ Deep-dive documentation available in [`docs/`](docs/):
 - **Wealth Disclosures**: Forbes Real-Time Billionaires Index (April 2026).
 - **Macroeconomic Indicators**: The World Bank Group (World Development Indicators: Nominal GDP in USD & National Population).
 
+> [!NOTE]
+> **Macroeconomic Vintage & Reference Years**: Country-level GDP and population values use the most recent available source data incorporated into the April 10, 2026 analytical snapshot. GDP reference years vary by country. Liechtenstein has a 2022 GDP observation and is retained as a documented historical-vintage exception pending source-level verification. Original source values are preserved to maintain reproducibility.
+
 ---
 
 <div align="center">
