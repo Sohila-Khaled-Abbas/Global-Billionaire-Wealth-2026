@@ -4514,3 +4514,320 @@ expression tmp_SourceSchemaContract =
 	lineageTag: 43cf9d3e-82df-40d0-809f-cf21dc1136c4
 	queryGroup: 99_Archive
 
+expression tmp_SnapshotProvenanceValidation =
+		let
+		    // ================================================
+		    // 1. PRODUCTION FACT TABLES
+		    // ================================================
+		
+		    Individual = FactBillionaire,
+		    Country = FactCountrySnapshot,
+		
+		    ExpectedSnapshotDate = p_SnapshotDate,
+		
+		    // ================================================
+		    // 2. SNAPSHOT DATE VALIDATION
+		    // ================================================
+		
+		    IndividualSnapshotDates =
+		        List.Distinct(
+		            List.RemoveNulls(Individual[snapshot_date])
+		        ),
+		
+		    CountrySnapshotDates =
+		        List.Distinct(
+		            List.RemoveNulls(Country[snapshot_date])
+		        ),
+		
+		    IndividualSnapshotDateErrors =
+		        Table.RowCount(
+		            Table.SelectRows(
+		                Individual,
+		                each
+		                    [snapshot_date] = null
+		                    or [snapshot_date] <> ExpectedSnapshotDate
+		            )
+		        ),
+		
+		    CountrySnapshotDateErrors =
+		        Table.RowCount(
+		            Table.SelectRows(
+		                Country,
+		                each
+		                    [snapshot_date] = null
+		                    or [snapshot_date] <> ExpectedSnapshotDate
+		            )
+		        ),
+		
+		    // ================================================
+		    // 3. SCRAPE TIMESTAMP VALIDATION
+		    // ================================================
+		
+		    MissingScrapeTimestamps =
+		        Table.RowCount(
+		            Table.SelectRows(
+		                Individual,
+		                each [scrape_timestamp] = null
+		            )
+		        ),
+		
+		    NonUTCTimestamps =
+		        Table.RowCount(
+		            Table.SelectRows(
+		                Individual,
+		                each
+		                    [scrape_timestamp] <> null
+		                    and (
+		                        DateTimeZone.ZoneHours(
+		                            [scrape_timestamp]
+		                        ) <> 0
+		                        or
+		                        DateTimeZone.ZoneMinutes(
+		                            [scrape_timestamp]
+		                        ) <> 0
+		                    )
+		            )
+		        ),
+		
+		    ScrapeDateMismatches =
+		        Table.RowCount(
+		            Table.SelectRows(
+		                Individual,
+		                each
+		                    [scrape_timestamp] = null
+		                    or
+		                    Date.From(
+		                        DateTimeZone.RemoveZone(
+		                            [scrape_timestamp]
+		                        )
+		                    ) <> ExpectedSnapshotDate
+		            )
+		        ),
+		
+		    // ================================================
+		    // 4. GDP DATA VINTAGE VALIDATION
+		    // ================================================
+		
+		    InvalidGDPYear =
+		        Table.RowCount(
+		            Table.SelectRows(
+		                Country,
+		                each
+		                    [gdp_year] = null
+		                    or [gdp_year] < 2023
+		                    or [gdp_year] > 2024
+		            )
+		        ),
+		
+		    // ================================================
+		    // 5. BUILD VALIDATION RESULT
+		    // ================================================
+		
+		    Result =
+		        #table(
+		            type table [
+		                Check = text,
+		                Actual = number,
+		                Expected = number,
+		                Status = text
+		            ],
+		            {
+		                {
+		                    "Individual distinct snapshot dates",
+		                    List.Count(IndividualSnapshotDates),
+		                    1,
+		                    if
+		                        List.Count(IndividualSnapshotDates) = 1
+		                        and List.First(IndividualSnapshotDates) = ExpectedSnapshotDate
+		                    then "Passed"
+		                    else "Investigate"
+		                },
+		
+		                {
+		                    "Country distinct snapshot dates",
+		                    List.Count(CountrySnapshotDates),
+		                    1,
+		                    if
+		                        List.Count(CountrySnapshotDates) = 1
+		                        and List.First(CountrySnapshotDates) = ExpectedSnapshotDate
+		                    then "Passed"
+		                    else "Investigate"
+		                },
+		
+		                {
+		                    "Individual snapshot-date mismatches",
+		                    IndividualSnapshotDateErrors,
+		                    0,
+		                    if IndividualSnapshotDateErrors = 0
+		                    then "Passed" else "Investigate"
+		                },
+		
+		                {
+		                    "Country snapshot-date mismatches",
+		                    CountrySnapshotDateErrors,
+		                    0,
+		                    if CountrySnapshotDateErrors = 0
+		                    then "Passed" else "Investigate"
+		                },
+		
+		                {
+		                    "Missing scrape timestamps",
+		                    MissingScrapeTimestamps,
+		                    0,
+		                    if MissingScrapeTimestamps = 0
+		                    then "Passed" else "Investigate"
+		                },
+		
+		                {
+		                    "Non-UTC scrape timestamps",
+		                    NonUTCTimestamps,
+		                    0,
+		                    if NonUTCTimestamps = 0
+		                    then "Passed" else "Investigate"
+		                },
+		
+		                {
+		                    "Scrape-date mismatches",
+		                    ScrapeDateMismatches,
+		                    0,
+		                    if ScrapeDateMismatches = 0
+		                    then "Passed" else "Investigate"
+		                },
+		
+		                {
+		                    "Invalid GDP year values",
+		                    InvalidGDPYear,
+		                    0,
+		                    if InvalidGDPYear = 0
+		                    then "Passed" else "Investigate"
+		                }
+		            }
+		        )
+		in
+		    Result
+	lineageTag: 062486f0-63b5-48e7-a86d-0d3d96b13d39
+	queryGroup: 99_Archive
+
+expression tmp_SnapshotProvenanceDetail =
+		let
+		    Individual = FactBillionaire,
+		    Country = FactCountrySnapshot,
+		
+		    // Summarize individual scrape timestamps
+		    TimestampGroups =
+		        Table.Group(
+		            Individual,
+		            {"scrape_timestamp"},
+		            {
+		                {
+		                    "Individual_Row_Count",
+		                    each Table.RowCount(_),
+		                    Int64.Type
+		                }
+		            }
+		        ),
+		
+		    AddTimestampType =
+		        Table.AddColumn(
+		            TimestampGroups,
+		            "Metadata_Type",
+		            each "Forbes scrape timestamp",
+		            type text
+		        ),
+		
+		    RenameTimestamp =
+		        Table.RenameColumns(
+		            AddTimestampType,
+		            {
+		                {"scrape_timestamp", "Metadata_Value"},
+		                {"Individual_Row_Count", "Record_Count"}
+		            }
+		        ),
+		
+		    TimestampDetail =
+		        Table.TransformColumnTypes(
+		            RenameTimestamp,
+		            {
+		                {"Metadata_Value", type text}
+		            }
+		        ),
+		
+		    // Summarize GDP year coverage
+		    GDPYearGroups =
+		        Table.Group(
+		            Country,
+		            {"gdp_year"},
+		            {
+		                {
+		                    "Record_Count",
+		                    each Table.RowCount(_),
+		                    Int64.Type
+		                }
+		            }
+		        ),
+		
+		    AddGDPType =
+		        Table.AddColumn(
+		            GDPYearGroups,
+		            "Metadata_Type",
+		            each "World Bank GDP year",
+		            type text
+		        ),
+		
+		    RenameGDP =
+		        Table.RenameColumns(
+		            AddGDPType,
+		            {
+		                {"gdp_year", "Metadata_Value"}
+		            }
+		        ),
+		
+		    GDPDetail =
+		        Table.TransformColumns(
+		            RenameGDP,
+		            {
+		                {
+		                    "Metadata_Value",
+		                    each Text.From(_, "en-US"),
+		                    type text
+		                }
+		            }
+		        ),
+		
+		    // Combine both provenance summaries
+		    Combined =
+		        Table.Combine(
+		            {
+		                Table.SelectColumns(
+		                    TimestampDetail,
+		                    {
+		                        "Metadata_Type",
+		                        "Metadata_Value",
+		                        "Record_Count"
+		                    }
+		                ),
+		
+		                Table.SelectColumns(
+		                    GDPDetail,
+		                    {
+		                        "Metadata_Type",
+		                        "Metadata_Value",
+		                        "Record_Count"
+		                    }
+		                )
+		            }
+		        ),
+		
+		    Sorted =
+		        Table.Sort(
+		            Combined,
+		            {
+		                {"Metadata_Type", Order.Ascending},
+		                {"Metadata_Value", Order.Ascending}
+		            }
+		        )
+		in
+		    Sorted
+	lineageTag: e81f75ff-c1be-4274-892d-c680d3a54a5d
+	queryGroup: 99_Archive
+
