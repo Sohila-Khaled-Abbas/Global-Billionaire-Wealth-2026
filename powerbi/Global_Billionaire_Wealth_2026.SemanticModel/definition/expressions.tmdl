@@ -682,13 +682,49 @@ expression qa_CountryAggregate =
 
 expression qa_CountryReconciliation =
 		let
-		  Source = Table.NestedJoin(qa_IndividualByCountry, {"iso3"}, qa_CountryAggregate, {"iso3"}, "qa_CountryAggregate", JoinKind.FullOuter)
+		  Source = Table.NestedJoin(qa_IndividualByCountry, {"iso3"}, qa_CountryAggregate, {"Aggregate_ISO3"}, "qa_CountryAggregate", JoinKind.FullOuter),
+		  #"Expanded qa_CountryAggregate" = Table.ExpandTableColumn(Source, "qa_CountryAggregate", {"Aggregate_ISO3", "country", "Aggregate_Billionaire_Count", "Aggregate_Total_Wealth_USD", "Aggregate_Mean_Wealth_USD_M", "Aggregate_Median_Wealth_USD_M", "Aggregate_Max_Wealth_USD_M", "Aggregate_Self_Made_Count", "Aggregate_Self_Made_Ratio_Pct", "Aggregate_Mean_Age", "Aggregate_Top_Billionaire"}, {"Aggregate_ISO3", "country", "Aggregate_Billionaire_Count", "Aggregate_Total_Wealth_USD", "Aggregate_Mean_Wealth_USD_M", "Aggregate_Median_Wealth_USD_M", "Aggregate_Max_Wealth_USD_M", "Aggregate_Self_Made_Count", "Aggregate_Self_Made_Ratio_Pct", "Aggregate_Mean_Age", "Aggregate_Top_Billionaire"}),
+		  #"Added custom" = Table.TransformColumnTypes(Table.AddColumn(#"Expanded qa_CountryAggregate", "Reconciliation_ISO3", each if [iso3] <> null then [iso3]
+		else [Aggregate_ISO3]), {{"Reconciliation_ISO3", type text}}),
+		  #"Added custom 1" = Table.TransformColumnTypes(Table.AddColumn(#"Added custom", "Count_Difference", each if [Individual_Billionaire_Count] = null
+		    or [Aggregate_Billionaire_Count] = null
+		then null
+		else
+		    [Individual_Billionaire_Count]
+		    - [Aggregate_Billionaire_Count]), {{"Count_Difference", Int64.Type}}),
+		  #"Added custom 2" = Table.TransformColumnTypes(Table.AddColumn(#"Added custom 1", "Wealth_Difference_USD", each if [Individual_Total_Wealth_USD] = null
+		    or [Aggregate_Total_Wealth_USD] = null
+		then null
+		else
+		    Number.From([Individual_Total_Wealth_USD])
+		    - Number.From([Aggregate_Total_Wealth_USD])), {{"Wealth_Difference_USD", Int64.Type}}),
+		  #"Added custom 3" = Table.AddColumn(#"Added custom 2", "Country_Match_Status", each if [iso3] = null then
+		    "Missing from individual data"
+		else if [Aggregate_ISO3] = null then
+		    "Missing from country aggregate"
+		else
+		    "Matched", type text),
+		  #"Added custom 4" = Table.TransformColumnTypes(Table.AddColumn(#"Added custom 3", "Count_Reconciliation_Status", each if [Country_Match_Status] <> "Matched" then
+		    "Not comparable"
+		else if [Count_Difference] = 0 then
+		    "Matched"
+		else
+		    "Count mismatch"), {{"Count_Reconciliation_Status", type text}}),
+		  #"Added custom 5" = Table.TransformColumnTypes(Table.AddColumn(#"Added custom 4", "Wealth_Reconciliation_Status", each if [Country_Match_Status] <> "Matched" then
+		    "Not comparable"
+		else if Number.Round(
+		    Number.Abs([Wealth_Difference_USD]),
+		    2
+		) = 0 then
+		    "Matched"
+		else
+		    "Wealth mismatch"), {{"Wealth_Reconciliation_Status", type text}})
 		in
-		  Source
+		  #"Added custom 5"
 	lineageTag: d32e7f72-5fed-4135-aead-000444168561
 	queryGroup: '05_QA & Reconciliation'
 
-	annotation PBI_ResultType = Exception
+	annotation PBI_ResultType = Table
 
 expression tmp_StagingValidation =
 		let
@@ -3230,6 +3266,129 @@ expression tmp_IndividualAggregationValidation =
 		    Result
 	lineageTag: f89f081c-a31a-439d-9780-38bb33998d82
 	queryGroup: 99_Archive
+
+	annotation PBI_ResultType = Table
+
+expression tmp_CountryReconciliationSummary =
+		let
+		    Source =
+		        qa_CountryReconciliation,
+		
+		    MatchedCountries =
+		        Table.SelectRows(
+		            Source,
+		            each [Country_Match_Status] = "Matched"
+		        ),
+		
+		    CountMismatches =
+		        Table.SelectRows(
+		            Source,
+		            each [Count_Reconciliation_Status] = "Count mismatch"
+		        ),
+		
+		    WealthMismatches =
+		        Table.SelectRows(
+		            Source,
+		            each [Wealth_Reconciliation_Status] = "Wealth mismatch"
+		        ),
+		
+		    WealthDifferences =
+		        List.RemoveNulls(
+		            Source[Wealth_Difference_USD]
+		        ),
+		
+		    MaximumWealthDifference =
+		        if List.IsEmpty(WealthDifferences) then
+		            null
+		        else
+		            List.Max(
+		                List.Transform(
+		                    WealthDifferences,
+		                    each Number.Abs(_)
+		                )
+		            ),
+		
+		    MissingIndividual =
+		        Table.SelectRows(
+		            Source,
+		            each [Country_Match_Status]
+		                = "Missing from individual data"
+		        ),
+		
+		    MissingAggregate =
+		        Table.SelectRows(
+		            Source,
+		            each [Country_Match_Status]
+		                = "Missing from country aggregate"
+		        ),
+		
+		    Result =
+		        #table(
+		            type table [
+		                Check = text,
+		                Actual = number,
+		                Expected = number,
+		                Status = text
+		            ],
+		            {
+		                {
+		                    "Total reconciliation rows",
+		                    Table.RowCount(Source),
+		                    80,
+		                    if Table.RowCount(Source) = 80
+		                    then "Passed" else "Investigate"
+		                },
+		                {
+		                    "Matched countries",
+		                    Table.RowCount(MatchedCountries),
+		                    80,
+		                    if Table.RowCount(MatchedCountries) = 80
+		                    then "Passed" else "Investigate"
+		                },
+		                {
+		                    "Missing individual countries",
+		                    Table.RowCount(MissingIndividual),
+		                    0,
+		                    if Table.RowCount(MissingIndividual) = 0
+		                    then "Passed" else "Investigate"
+		                },
+		                {
+		                    "Missing aggregate countries",
+		                    Table.RowCount(MissingAggregate),
+		                    0,
+		                    if Table.RowCount(MissingAggregate) = 0
+		                    then "Passed" else "Investigate"
+		                },
+		                {
+		                    "Count mismatches",
+		                    Table.RowCount(CountMismatches),
+		                    0,
+		                    if Table.RowCount(CountMismatches) = 0
+		                    then "Passed" else "Investigate"
+		                },
+		                {
+		                    "Wealth mismatches",
+		                    Table.RowCount(WealthMismatches),
+		                    0,
+		                    if Table.RowCount(WealthMismatches) = 0
+		                    then "Passed" else "Investigate"
+		                },
+		                {
+		                    "Maximum absolute wealth difference",
+		                    if MaximumWealthDifference = null
+		                    then 0
+		                    else MaximumWealthDifference,
+		                    0,
+		                    if MaximumWealthDifference = null
+		                        or MaximumWealthDifference <= 0.005
+		                    then "Passed" else "Investigate"
+		                }
+		            }
+		        )
+		in
+		    Result
+	lineageTag: e6908567-5acb-49c5-834f-e34fd2575d88
+	queryGroup: '05_QA & Reconciliation'
 
 	annotation PBI_ResultType = Table
 
