@@ -5407,3 +5407,74 @@ expression tmp_FunctionLibraryValidation =
 	lineageTag: bbb3ee00-23ea-4290-b208-9523cac83df7
 	queryGroup: 99_Archive
 
+expression tmp_DimCountryEnrichmentValidation =
+		let
+		    Source = DimCountry,
+		
+		    ISO3Values =
+		        List.RemoveNulls(Source[iso3]),
+		
+		    DisplayLabels =
+		        List.RemoveNulls(Source[country_display_label]),
+		
+		    DistinctISO3 =
+		        List.Count(List.Distinct(ISO3Values)),
+		
+		    DistinctLabels =
+		        List.Count(List.Distinct(DisplayLabels)),
+		
+		    MissingLabels =
+		        Table.RowCount(Source)
+		            - List.Count(DisplayLabels),
+		
+		    Result =
+		        #table(
+		            type table [
+		                Check = text,
+		                Actual = number,
+		                Expected = number,
+		                Status = text
+		            ],
+		            {
+		                {
+		                    "Country dimension rows",
+		                    Table.RowCount(Source),
+		                    80,
+		                    if Table.RowCount(Source) = 80
+		                    then "Passed" else "Investigate"
+		                },
+		                {
+		                    "Distinct ISO3 keys",
+		                    DistinctISO3,
+		                    80,
+		                    if DistinctISO3 = 80
+		                    then "Passed" else "Investigate"
+		                },
+		                {
+		                    "Missing ISO3 keys",
+		                    Table.RowCount(Source) - List.Count(ISO3Values),
+		                    0,
+		                    if Table.RowCount(Source) = List.Count(ISO3Values)
+		                    then "Passed" else "Investigate"
+		                },
+		                {
+		                    "Distinct country display labels",
+		                    DistinctLabels,
+		                    80,
+		                    if DistinctLabels = 80
+		                    then "Passed" else "Investigate"
+		                },
+		                {
+		                    "Missing country display labels",
+		                    MissingLabels,
+		                    0,
+		                    if MissingLabels = 0
+		                    then "Passed" else "Investigate"
+		                }
+		            }
+		        )
+		in
+		    Result
+	lineageTag: 744e78a7-8562-4c89-8cd3-37713ffacf53
+	queryGroup: 99_Archive
+

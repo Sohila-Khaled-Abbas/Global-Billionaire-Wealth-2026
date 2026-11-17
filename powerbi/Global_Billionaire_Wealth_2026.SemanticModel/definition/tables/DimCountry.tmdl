@@ -25,16 +25,38 @@ table DimCountry
 
 		annotation SummarizationSetBy = Automatic
 
+	column country_display_label
+		dataType: string
+		lineageTag: 39570f9d-b5aa-4ecd-bf92-ee2ac159e0b9
+		summarizeBy: none
+		sourceColumn: country_display_label
+
+		annotation SummarizationSetBy = Automatic
+
+	column country_name_alignment
+		dataType: string
+		lineageTag: da63de73-5e69-4aee-ab9b-f151772e8ad7
+		summarizeBy: none
+		sourceColumn: country_name_alignment
+
+		annotation SummarizationSetBy = Automatic
+
 	partition DimCountry = m
 		mode: import
 		queryGroup: 04_DataModel\Dimensions
 		source =
 				let
-				    // Reference validated country staging
+				    // ================================================
+				    // 1. REFERENCE STAGING
+				    // ================================================
+				
 				    Source =
 				        stg_BillionaireCountry,
 				
-				    // Retain descriptive attributes only
+				    // ================================================
+				    // 2. SELECT DIMENSION ATTRIBUTES
+				    // ================================================
+				
 				    SelectedColumns =
 				        Table.SelectColumns(
 				            Source,
@@ -45,36 +67,111 @@ table DimCountry
 				            }
 				        ),
 				
-				    // Standardize country keys
-				    Standardized =
+				    // ================================================
+				    // 3. CLEAN DESCRIPTIVE TEXT
+				    // ================================================
+				
+				    CleanedText =
 				        Table.TransformColumns(
 				            SelectedColumns,
 				            {
 				                {
-				                    "iso3",
-				                    each if _ = null
-				                        then null
-				                        else Text.Upper(Text.Trim(_)),
+				                    "country",
+				                    fn_CleanText,
+				                    type nullable text
+				                },
+				                {
+				                    "wb_country_name",
+				                    fn_CleanText,
 				                    type nullable text
 				                }
 				            }
 				        ),
 				
-				    ChangedTypes =
-				        Table.TransformColumnTypes(
-				            Standardized,
+				    // ================================================
+				    // 4. NORMALIZE NATURAL KEY
+				    // ================================================
+				
+				    NormalizedISO3 =
+				        Table.TransformColumns(
+				            CleanedText,
 				            {
-				                {"country", type text},
-				                {"wb_country_name", type text}
+				                {
+				                    "iso3",
+				                    fn_NormalizeISO3,
+				                    type nullable text
+				                }
 				            }
 				        ),
+				
+				    // ================================================
+				    // 5. CREATE DISPLAY LABEL
+				    // ================================================
+				
+				    AddCountryDisplayLabel =
+				        Table.AddColumn(
+				            NormalizedISO3,
+				            "country_display_label",
+				            each
+				                if [country] = null or [iso3] = null then
+				                    null
+				                else
+				                    [country] & " (" & [iso3] & ")",
+				            type nullable text
+				        ),
+				
+				    // ================================================
+				    // 6. COMPARE COUNTRY NAMING SYSTEMS
+				    // ================================================
+				
+				    AddNameAlignment =
+				        Table.AddColumn(
+				            AddCountryDisplayLabel,
+				            "country_name_alignment",
+				            each
+				                if
+				                    [country] = null
+				                    or [wb_country_name] = null
+				                then
+				                    "Missing name"
+				                else if
+				                    Text.Upper([country])
+				                    =
+				                    Text.Upper([wb_country_name])
+				                then
+				                    "Same label"
+				                else
+				                    "Different source label",
+				            type text
+				        ),
+				
+				    // ================================================
+				    // 7. APPLY FINAL TYPES
+				    // ================================================
+				
+				    ChangedTypes =
+				        Table.TransformColumnTypes(
+				            AddNameAlignment,
+				            {
+				                {"iso3", type text},
+				                {"country", type text},
+				                {"wb_country_name", type text},
+				                {"country_display_label", type text},
+				                {"country_name_alignment", type text}
+				            }
+				        ),
+				
+				    // ================================================
+				    // 8. SORT FOR INSPECTION
+				    // ================================================
 				
 				    SortedCountries =
 				        Table.Sort(
 				            ChangedTypes,
-				            {{"country", Order.Ascending}}
+				            {
+				                {"country", Order.Ascending}
+				            }
 				        )
-				
 				in
 				    SortedCountries
 

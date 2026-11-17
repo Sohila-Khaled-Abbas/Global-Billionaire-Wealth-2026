@@ -26,22 +26,22 @@ table DimIndustry
 				        ),
 				
 				    // Reapply consistent text standardization
-				    Standardized =
-				        Table.TransformColumns(
-				            SelectedColumns,
+				    Cleaned =
+				    Table.TransformColumns(
+				        SelectedColumns,
+				        {
 				            {
-				                {
-				                    "industry",
-				                    fn_StandardizeCountry,
-				                    type nullable text
-				                }
+				                "industry",
+				                fn_CleanText,
+				                type nullable text
 				            }
-				        ),
+				        }
+				    ),
 				
 				    // Remove invalid labels
 				    ValidIndustries =
 				        Table.SelectRows(
-				            Standardized,
+				            Cleaned,
 				            each
 				                [industry] <> null
 				                and [industry] <> ""
@@ -62,4 +62,6 @@ table DimIndustry
 				        )
 				in
 				    SortedIndustries
+
+	annotation PBI_ResultType = Table
 
