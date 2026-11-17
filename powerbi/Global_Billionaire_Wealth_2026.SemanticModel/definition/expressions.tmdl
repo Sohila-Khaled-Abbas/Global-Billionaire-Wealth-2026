@@ -3700,3 +3700,47 @@ expression qa_CountryMetricDetail =
 	lineageTag: 6195d1c5-cdf2-4b7a-8fb5-40b23d6e777f
 	queryGroup: '05_QA & Reconciliation'
 
+expression tmp_DimCountryValidation =
+		let
+		    Source = DimCountry,
+		
+		    ISO3Values =
+		        List.RemoveNulls(Source[iso3]),
+		
+		    Result =
+		        #table(
+		            type table [
+		                Check = text,
+		                Actual = number,
+		                Expected = number,
+		                Status = text
+		            ],
+		            {
+		                {
+		                    "Dimension rows",
+		                    Table.RowCount(Source),
+		                    80,
+		                    if Table.RowCount(Source) = 80
+		                    then "Passed" else "Investigate"
+		                },
+		                {
+		                    "Distinct ISO3",
+		                    List.Count(List.Distinct(ISO3Values)),
+		                    80,
+		                    if List.Count(List.Distinct(ISO3Values)) = 80
+		                    then "Passed" else "Investigate"
+		                },
+		                {
+		                    "Missing ISO3",
+		                    Table.RowCount(Source) - List.Count(ISO3Values),
+		                    0,
+		                    if Table.RowCount(Source) = List.Count(ISO3Values)
+		                    then "Passed" else "Investigate"
+		                }
+		            }
+		        )
+		in
+		    Result
+	lineageTag: 591dcbbb-365c-4629-aaea-3e7e60197e46
+	queryGroup: 99_Archive
+

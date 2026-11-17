@@ -13,11 +13,11 @@ queryGroup 02_Staging
 
 queryGroup '00_Parameters & Functions'
 
-	annotation PBI_QueryGroupOrder = 1
+	annotation PBI_QueryGroupOrder = 0
 
 queryGroup 01_Source
 
-	annotation PBI_QueryGroupOrder = 2
+	annotation PBI_QueryGroupOrder = 1
 
 queryGroup 03_Transformations
 
@@ -37,17 +37,19 @@ queryGroup 04_DataModel\Facts
 
 queryGroup '05_QA & Reconciliation'
 
-	annotation PBI_QueryGroupOrder = 7
+	annotation PBI_QueryGroupOrder = 5
 
 queryGroup 99_Archive
 
-	annotation PBI_QueryGroupOrder = 8
+	annotation PBI_QueryGroupOrder = 6
 
 annotation __PBI_TimeIntelligenceEnabled = 0
 
-annotation PBI_QueryOrder = ["src_BillionaireIndividual","src_BillionaireCountry","stg_BillionaireIndividual","stg_BillionaireCountry","p_DataFolderPath","p_SnapshotDate","fn_StandardizeCountry","fn_ParseIndustries","tmp_SourceValidation","tmp_StagingValidation","tmp_StagingHealth","tmp_KeyAudit","tmp_IndustryFunctionTest","tmp_IndustryCoverage","tmp_IndustryDelimiterAudit","tmp_IndustryDistribution","tmp_IndustryDistributionValidation","tmp_IndividualQualityAudit","tmp_NetWorthExceptions","tmp_NetWorthConsistency","tmp_RankAudit","tmp_NetWorthConsistencySummary","tmp_RankTieAudit","tmp_RankTieAuditSummary","tmp_AgeBirthYearAudit","tmp_CountryNullAudit","tmp_CountryNumericAudit","tmp_CountryPrecisionAudit","tmp_MeanWealthRoundingExceptions","tmp_MeanWealthPrecisionDiagnostic","tmp_MeanWealthTypeAudit","tmp_IndividualAggregationValidation","qa_IndividualByCountry","qa_CountryAggregate","qa_CountryReconciliation","qa_CountryMetricDetail","tmp_CountryMetricReconciliation","tmp_CountryMetricReconciliationSummary","tmp_CountryReconciliationSummary","tmp_CountryMetricDetailSummary","int_BillionaireIndustryBridge","int_IndustryLookup"]
+annotation PBI_QueryOrder = ["src_BillionaireIndividual","src_BillionaireCountry","stg_BillionaireIndividual","stg_BillionaireCountry","p_DataFolderPath","p_SnapshotDate","fn_StandardizeCountry","fn_ParseIndustries","tmp_SourceValidation","tmp_StagingValidation","tmp_StagingHealth","tmp_KeyAudit","tmp_IndustryFunctionTest","tmp_IndustryCoverage","tmp_IndustryDelimiterAudit","tmp_IndustryDistribution","tmp_IndustryDistributionValidation","tmp_IndividualQualityAudit","tmp_NetWorthExceptions","tmp_NetWorthConsistency","tmp_RankAudit","tmp_NetWorthConsistencySummary","tmp_RankTieAudit","tmp_RankTieAuditSummary","tmp_AgeBirthYearAudit","tmp_CountryNullAudit","tmp_CountryNumericAudit","tmp_CountryPrecisionAudit","tmp_MeanWealthRoundingExceptions","tmp_MeanWealthPrecisionDiagnostic","tmp_MeanWealthTypeAudit","tmp_IndividualAggregationValidation","qa_IndividualByCountry","qa_CountryAggregate","qa_CountryReconciliation","qa_CountryMetricDetail","tmp_CountryMetricReconciliation","tmp_CountryMetricReconciliationSummary","tmp_CountryReconciliationSummary","tmp_CountryMetricDetailSummary","int_BillionaireIndustryBridge","int_IndustryLookup","DimCountry","tmp_DimCountryValidation"]
 
 annotation PBI_ProTooling = ["DevMode"]
+
+ref table DimCountry
 
 ref cultureInfo en-US
 

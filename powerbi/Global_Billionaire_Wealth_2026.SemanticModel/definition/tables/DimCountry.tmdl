@@ -1,0 +1,161 @@
+table DimCountry
+	lineageTag: 24f7a030-b074-4bc9-b534-2a428f49b5a0
+
+	column iso3
+		dataType: string
+		lineageTag: b55f8715-d1e7-4dc7-b2f2-feacc1ff5912
+		summarizeBy: none
+		sourceColumn: iso3
+
+		annotation SummarizationSetBy = Automatic
+
+	column country
+		dataType: string
+		lineageTag: 2a4d00b0-4221-4d4a-a0fe-893253602c7a
+		summarizeBy: none
+		sourceColumn: country
+
+		annotation SummarizationSetBy = Automatic
+
+	column wb_country_name
+		dataType: string
+		lineageTag: 80124e44-e215-4d88-832c-5326d4eaf405
+		summarizeBy: none
+		sourceColumn: wb_country_name
+
+		annotation SummarizationSetBy = Automatic
+
+	column gdp_usd
+		dataType: decimal
+		formatString: "AED"#,0.###############;-"AED"#,0.###############;"AED"#,0.###############
+		lineageTag: 93a6db6d-10eb-4f21-984f-1434f7ff5728
+		summarizeBy: sum
+		sourceColumn: gdp_usd
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"currencyCulture":"en-AE"}
+
+	column population
+		dataType: int64
+		formatString: 0
+		lineageTag: 065f6115-7e07-4c48-ab78-7faca22ff377
+		summarizeBy: sum
+		sourceColumn: population
+
+		annotation SummarizationSetBy = Automatic
+
+	column gdp_year
+		dataType: int64
+		formatString: 0
+		lineageTag: b40e147c-0171-4fda-ace0-485631b652f6
+		summarizeBy: sum
+		sourceColumn: gdp_year
+
+		annotation SummarizationSetBy = Automatic
+
+	column source_country_wealth_rank
+		dataType: int64
+		formatString: 0
+		lineageTag: 2262da57-b28f-40ed-9a11-0782088b1f3f
+		summarizeBy: sum
+		sourceColumn: source_country_wealth_rank
+
+		annotation SummarizationSetBy = Automatic
+
+	column wealth_concentration_tier
+		dataType: string
+		lineageTag: 89746f26-35a9-4df8-b755-0bb6eec78e65
+		summarizeBy: none
+		sourceColumn: wealth_concentration_tier
+
+		annotation SummarizationSetBy = Automatic
+
+	column sector_dominance_score
+		dataType: double
+		lineageTag: 05774536-c02e-409e-a710-99d60c83df9e
+		summarizeBy: sum
+		sourceColumn: sector_dominance_score
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column dominant_industry_by_wealth
+		dataType: string
+		lineageTag: f8e5d742-ce76-4bc6-8ba7-9b617c2c491d
+		summarizeBy: none
+		sourceColumn: dominant_industry_by_wealth
+
+		annotation SummarizationSetBy = Automatic
+
+	partition DimCountry = m
+		mode: import
+		queryGroup: 04_DataModel\Dimensions
+		source =
+				let
+				    // 1. Reference validated country staging
+				    Source =
+				        stg_BillionaireCountry,
+				
+				    // 2. Keep country-level descriptive attributes
+				    SelectedColumns =
+				        Table.SelectColumns(
+				            Source,
+				            {
+				                "iso3",
+				                "country",
+				                "wb_country_name",
+				                "gdp_usd",
+				                "population",
+				                "gdp_year",
+				                "country_wealth_rank",
+				                "wealth_concentration_tier",
+				                "sector_dominance_score",
+				                "dominant_industry_by_wealth"
+				            }
+				        ),
+				
+				    // 3. Rename source-specific fields
+				    RenamedColumns =
+				        Table.RenameColumns(
+				            SelectedColumns,
+				            {
+				                {
+				                    "country_wealth_rank",
+				                    "source_country_wealth_rank"
+				                }
+				            }
+				        ),
+				
+				    // 4. Explicitly enforce data types
+				    ChangedTypes =
+				        Table.TransformColumnTypes(
+				            RenamedColumns,
+				            {
+				                {"iso3", type text},
+				                {"country", type text},
+				                {"wb_country_name", type text},
+				                {"gdp_usd", Currency.Type},
+				                {"population", Int64.Type},
+				                {"gdp_year", Int64.Type},
+				                {"source_country_wealth_rank", Int64.Type},
+				                {"wealth_concentration_tier", type text},
+				                {"sector_dominance_score", type number},
+				                {"dominant_industry_by_wealth", type text}
+				            },
+				            "en-US"
+				        ),
+				
+				    // 5. Sort country names for easier inspection
+				    SortedCountries =
+				        Table.Sort(
+				            ChangedTypes,
+				            {{"country", Order.Ascending}}
+				        )
+				
+				in
+				    SortedCountries
+
+	annotation PBI_ResultType = Table
+
