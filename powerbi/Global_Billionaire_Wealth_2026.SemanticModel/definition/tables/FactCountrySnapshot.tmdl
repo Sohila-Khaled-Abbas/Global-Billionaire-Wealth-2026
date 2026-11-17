@@ -126,13 +126,14 @@ table FactCountrySnapshot
 
 	column country_wealth_gdp_pct
 		dataType: double
+		formatString: 0.00"%"
 		lineageTag: 6203e9a2-8fbd-4f7e-b671-eff97955c756
 		summarizeBy: sum
 		sourceColumn: country_wealth_gdp_pct
 
 		annotation SummarizationSetBy = Automatic
 
-		annotation PBI_FormatHint = {"isGeneralNumber":true}
+		annotation PBI_FormatHint = {"isCustom":true}
 
 	column billionaires_per_million_pop
 		dataType: double
@@ -211,6 +212,23 @@ table FactCountrySnapshot
 		annotation SummarizationSetBy = Automatic
 
 		annotation UnderlyingDateTimeDataType = Date
+
+	column wealth_concentration_sort
+		dataType: int64
+		formatString: 0
+		lineageTag: 82644706-27ce-4f66-ab6d-9a6d30fc0215
+		summarizeBy: sum
+		sourceColumn: wealth_concentration_sort
+
+		annotation SummarizationSetBy = Automatic
+
+	column gdp_vintage_status
+		dataType: string
+		lineageTag: 10076968-8272-46cc-a734-b6cfeeb6c268
+		summarizeBy: none
+		sourceColumn: gdp_vintage_status
+
+		annotation SummarizationSetBy = Automatic
 
 	partition FactCountrySnapshot = m
 		mode: import
@@ -328,8 +346,12 @@ table FactCountrySnapshot
 				            {
 				                {"country_wealth_rank", Order.Ascending}
 				            }
-				        )
+				        ),
+				  #"Inserted conditional column" = Table.AddColumn(SortedCountries, "wealth_concentration_sort", each if Text.Contains([wealth_concentration_tier], "Extreme") then 1 else if Text.Contains([wealth_concentration_tier], "Very High") then 2 else if Text.Contains([wealth_concentration_tier], "High") then 3 else if Text.Contains([wealth_concentration_tier], "Moderate") then 4 else if Text.Contains([wealth_concentration_tier], "Low") then 5 else 6, Int64.Type),
+				  #"Reordered columns" = Table.ReorderColumns(#"Inserted conditional column", {"iso3", "country_wealth_rank", "billionaire_count", "total_wealth_usd_m", "total_wealth_usd", "mean_wealth_usd_m", "median_wealth_usd_m", "max_wealth_usd_m", "top_billionaire", "dominant_industry_by_wealth", "self_made_count", "self_made_ratio_pct", "mean_age", "country_wealth_gdp_pct", "billionaires_per_million_pop", "wealth_concentration_tier", "wealth_concentration_sort", "gdp_per_billionaire_bn", "sector_dominance_score", "gdp_usd", "population", "gdp_year", "snapshot_date"}),
+				  #"Inserted conditional column 1" = Table.AddColumn(#"Reordered columns", "gdp_vintage_status", each if [gdp_year] = 2024 then "2024 reference" else if [gdp_year] = 2023 then "2023 reference" else if [gdp_year] < 2023 then "Earlier vintage – review" else if [gdp_year] > 2024 then "Future vintage – investigate" else "Missing GDP year", type text),
+				  #"Reordered columns 1" = Table.ReorderColumns(#"Inserted conditional column 1", {"iso3", "country_wealth_rank", "billionaire_count", "total_wealth_usd_m", "total_wealth_usd", "mean_wealth_usd_m", "median_wealth_usd_m", "max_wealth_usd_m", "top_billionaire", "dominant_industry_by_wealth", "self_made_count", "self_made_ratio_pct", "mean_age", "country_wealth_gdp_pct", "billionaires_per_million_pop", "wealth_concentration_tier", "wealth_concentration_sort", "gdp_per_billionaire_bn", "sector_dominance_score", "gdp_usd", "gdp_vintage_status", "population", "gdp_year", "snapshot_date"})
 				
 				in
-				    SortedCountries
+				    #"Reordered columns 1"
 
