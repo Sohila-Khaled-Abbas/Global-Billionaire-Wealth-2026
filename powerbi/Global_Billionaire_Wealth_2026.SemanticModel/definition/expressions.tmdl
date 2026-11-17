@@ -3791,3 +3791,121 @@ expression tmp_DimIndustryValidation =
 	lineageTag: c57ed335-5796-4bcd-b0e8-8340bc6980db
 	queryGroup: 99_Archive
 
+expression tmp_FactBillionaireValidation =
+		let
+		    Source =
+		        FactBillionaire,
+		
+		    // Individual business keys
+		    PersonKeys =
+		        List.RemoveNulls(Source[forbes_uri]),
+		
+		    DistinctPersonKeys =
+		        List.Distinct(PersonKeys),
+		
+		    // Country foreign keys
+		    CountryKeys =
+		        List.Distinct(
+		            List.RemoveNulls(Source[iso3])
+		        ),
+		
+		    ValidCountryKeys =
+		        List.Distinct(DimCountry[iso3]),
+		
+		    UnknownCountries =
+		        List.Difference(
+		            CountryKeys,
+		            ValidCountryKeys
+		        ),
+		
+		    // Industry foreign keys
+		    IndustryKeys =
+		        List.Distinct(
+		            List.RemoveNulls(Source[industry])
+		        ),
+		
+		    ValidIndustryKeys =
+		        List.Distinct(DimIndustry[industry]),
+		
+		    UnknownIndustries =
+		        List.Difference(
+		            IndustryKeys,
+		            ValidIndustryKeys
+		        ),
+		
+		    // =========================================
+		    // VALIDATION OUTPUT
+		    // =========================================
+		
+		    Result =
+		        #table(
+		            type table [
+		                Check = text,
+		                Actual = number,
+		                Expected = number,
+		                Status = text
+		            ],
+		            {
+		                {
+		                    "Fact rows",
+		                    Table.RowCount(Source),
+		                    3384,
+		                    if Table.RowCount(Source) = 3384
+		                    then "Passed" else "Investigate"
+		                },
+		                {
+		                    "Distinct Forbes URI",
+		                    List.Count(DistinctPersonKeys),
+		                    3384,
+		                    if List.Count(DistinctPersonKeys) = 3384
+		                    then "Passed" else "Investigate"
+		                },
+		                {
+		                    "Missing Forbes URI",
+		                    Table.RowCount(Source)
+		                        - List.Count(PersonKeys),
+		                    0,
+		                    if Table.RowCount(Source)
+		                        = List.Count(PersonKeys)
+		                    then "Passed" else "Investigate"
+		                },
+		                {
+		                    "Unmatched country codes",
+		                    List.Count(UnknownCountries),
+		                    0,
+		                    if List.IsEmpty(UnknownCountries)
+		                    then "Passed" else "Investigate"
+		                },
+		                {
+		                    "Unmatched industry labels",
+		                    List.Count(UnknownIndustries),
+		                    0,
+		                    if List.IsEmpty(UnknownIndustries)
+		                    then "Passed" else "Investigate"
+		                },
+		                {
+		                    "Missing ages",
+		                    List.Count(
+		                        List.Select(
+		                            Source[age],
+		                            each _ = null
+		                        )
+		                    ),
+		                    48,
+		                    if List.Count(
+		                        List.Select(
+		                            Source[age],
+		                            each _ = null
+		                        )
+		                    ) = 48
+		                    then "Passed" else "Investigate"
+		                }
+		            }
+		        )
+		in
+		    Result
+	lineageTag: b3e1987f-b9d8-4f1f-93c8-574a826ea172
+	queryGroup: 99_Archive
+
+	annotation PBI_ResultType = Table
+
