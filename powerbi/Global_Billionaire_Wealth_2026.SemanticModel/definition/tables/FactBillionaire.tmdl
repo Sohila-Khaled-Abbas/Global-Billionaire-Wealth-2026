@@ -100,46 +100,6 @@ table FactBillionaire
 
 		annotation UnderlyingDateTimeDataType = Date
 
-	column person_name
-		dataType: string
-		lineageTag: b0e159f6-0047-4eb8-86f4-16ba8b303ecf
-		summarizeBy: none
-		sourceColumn: person_name
-
-		annotation SummarizationSetBy = Automatic
-
-	column source_of_wealth
-		dataType: string
-		lineageTag: d2399730-5783-49f1-98d8-1796cd2530a8
-		summarizeBy: none
-		sourceColumn: source_of_wealth
-
-		annotation SummarizationSetBy = Automatic
-
-	column industry
-		dataType: string
-		lineageTag: 31d42cc1-f165-4e8b-bf92-592341e41f4d
-		summarizeBy: none
-		sourceColumn: industry
-
-		annotation SummarizationSetBy = Automatic
-
-	column state
-		dataType: string
-		lineageTag: 97b18c6a-3250-4c12-8367-969be367fe9b
-		summarizeBy: none
-		sourceColumn: state
-
-		annotation SummarizationSetBy = Automatic
-
-	column city
-		dataType: string
-		lineageTag: 5c924184-cf7b-4e3a-b871-f801ba05c696
-		summarizeBy: none
-		sourceColumn: city
-
-		annotation SummarizationSetBy = Automatic
-
 	column wealth_gdp_ratio_pct
 		dataType: double
 		lineageTag: e3c36e04-8b04-471c-8ad7-4d809300c825
@@ -204,105 +164,226 @@ table FactBillionaire
 
 		annotation SummarizationSetBy = Automatic
 
+	column person_name
+		dataType: string
+		lineageTag: 642e3f2e-23ca-47e9-a98b-728bfc5820c6
+		summarizeBy: none
+		sourceColumn: person_name
+
+		annotation SummarizationSetBy = Automatic
+
+	column source_of_wealth
+		dataType: string
+		lineageTag: 8960ca6a-af4b-40f8-b310-89e90494c710
+		summarizeBy: none
+		sourceColumn: source_of_wealth
+
+		annotation SummarizationSetBy = Automatic
+
+	column industry
+		dataType: string
+		lineageTag: 86ff6abf-13e7-4475-882d-1e40eaa2aaa2
+		summarizeBy: none
+		sourceColumn: industry
+
+		annotation SummarizationSetBy = Automatic
+
+	column state
+		dataType: string
+		lineageTag: f2ecc7c3-1e19-4143-bb82-f1d1246f03ef
+		summarizeBy: none
+		sourceColumn: state
+
+		annotation SummarizationSetBy = Automatic
+
+	column city
+		dataType: string
+		lineageTag: 3dd055c9-5a9d-4283-b568-8924fc247769
+		summarizeBy: none
+		sourceColumn: city
+
+		annotation SummarizationSetBy = Automatic
+
 	partition FactBillionaire = m
 		mode: import
 		queryGroup: 04_DataModel\Facts
 		source =
 				let
 				    // =========================================
-				    // 1. REFERENCE VALIDATED STAGING TABLE
+				    // 1. CONFIGURATION & METADATA DEFINITIONS
 				    // =========================================
+				    Source = stg_BillionaireIndividual,
+				    SnapshotDate = Date.From(p_SnapshotDate),
 				
-				    Source =
-				        stg_BillionaireIndividual,
+				    // Single source of truth: {SourceColumn, TargetColumn, DataType}
+				    ColumnSchema = {
+				        {"rank", "rank", Int64.Type},
+				        {"person_name", "person_name", type text},
+				        {"gender", "gender", type text},
+				        {"age", "age", Int64.Type},
+				        {"birth_year", "birth_year", Int64.Type},
+				        {"iso3", "iso3", type text},
+				        {"state", "state", type text},
+				        {"city", "city", type text},
+				        {"net_worth_usd", "net_worth_usd", Currency.Type},
+				        {"source_of_wealth", "source_of_wealth", type text},
+				        {"primary_industry", "industry", type text},
+				        {"self_made", "self_made", type logical},
+				        {"wealth_gdp_ratio_pct", "wealth_gdp_ratio_pct", type number},
+				        {"wealth_per_citizen_usd", "wealth_per_citizen_usd", Currency.Type},
+				        {"wealth_country_share_pct", "wealth_country_share_pct", type number},
+				        {"forbes_uri", "forbes_uri", type text},
+				        {"scrape_timestamp", "scrape_timestamp", type datetimezone}
+				    },
+				
+				    // Columns routed through fn_CleanText in place
+				    TextColumnsToClean = {
+				        "person_name",
+				        "source_of_wealth",
+				        "industry",
+				        "state",
+				        "city"
+				    },
+				
+				    // Descending lower-bound thresholds: {MinNetWorthUSD, TierLabel, SortOrder}
+				    WealthTierRules = {
+				        {100000000000, "$100B+", 1},
+				        {50000000000,  "$50B to under $100B", 2},
+				        {10000000000,  "$10B to under $50B", 3},
+				        {5000000000,   "$5B to under $10B", 4},
+				        {1000000000,   "$1B to under $5B", 5},
+				        {-Number.PositiveInfinity, "Below $1B", 6}
+				    },
+				
+				    // Ascending exclusive upper-bound thresholds: {MaxExclusiveAge, BandLabel}
+				    AgeBandRules = {
+				        {30, "Under 30"},
+				        {40, "30–39"},
+				        {50, "40–49"},
+				        {60, "50–59"},
+				        {70, "60–69"},
+				        {80, "70–79"}
+				    },
 				
 				    // =========================================
-				    // 2. SELECT INDIVIDUAL-LEVEL FIELDS
+				    // 2. PROJECT, RENAME & ENFORCE DATA TYPES
 				    // =========================================
+				    SourceCols = List.Transform(ColumnSchema, each _{0}),
+				    RenamePairs = List.Transform(
+				        List.Select(ColumnSchema, each _{0} <> _{1}),
+				        each {_{0}, _{1}}
+				    ),
+				    TypePairs = List.Transform(ColumnSchema, each {_{1}, _{2}}),
 				
-				    SelectedColumns =
-				        Table.SelectColumns(Source, {"rank", "person_name", "gender", "age", "iso3", "state", "city", "net_worth_usd", "source_of_wealth", "primary_industry", "self_made", "wealth_gdp_ratio_pct", "wealth_per_citizen_usd", "wealth_country_share_pct", "forbes_uri", "scrape_timestamp", "birth_year"}),
+				    SelectedColumns = Table.SelectColumns(Source, SourceCols),
+				    RenamedColumns = Table.RenameColumns(SelectedColumns, RenamePairs),
+				    TypedBase = Table.TransformColumnTypes(RenamedColumns, TypePairs, "en-US"),
 				
 				    // =========================================
-				    // 3. RENAME INDUSTRY FOREIGN KEY
+				    // 3. IN-PLACE TEXT STANDARDIZATION
 				    // =========================================
-				
-				    RenamedColumns =
-				        Table.RenameColumns(
-				            SelectedColumns,
-				            {
-				                {"primary_industry", "industry"}
-				            }
+				    TextTransformOps =
+				        {
+				            {"iso3", each if _ = null then null else Text.Upper(Text.Trim(_)), type nullable text}
+				        }
+				        & List.Transform(
+				            TextColumnsToClean,
+				            each {_, (val) => if val = null then null else fn_CleanText(val), type nullable text}
 				        ),
 				
-				    // =========================================
-				    // 4. APPLY SEMANTIC MODEL DATA TYPES
-				    // =========================================
-				
-				    ChangedTypes =
-				        Table.TransformColumnTypes(
-				            RenamedColumns,
-				            {
-				                {"forbes_uri", type text},
-				                {"rank", Int64.Type},
-				                {"person_name", type text},
-				                {"iso3", type text},
-				                {"gender", type text},
-				                {"age", Int64.Type},
-				                {"birth_year", Int64.Type},
-				                {"state", type text},
-				                {"city", type text},
-				                {"net_worth_usd", Currency.Type},
-				                {"source_of_wealth", type text},
-				                {"industry", type text},
-				                {"self_made", type logical},
-				                {"scrape_timestamp", type datetimezone}
-				            },
-				            "en-US"
-				        ),
+				    CleanedText = Table.TransformColumns(TypedBase, TextTransformOps),
 				
 				    // =========================================
-				    // 5. ADD SNAPSHOT DATE
+				    // 4. DERIVED BUSINESS ATTRIBUTES
 				    // =========================================
+				    AddedSnapshotDate = Table.AddColumn(
+				        CleanedText,
+				        "snapshot_date",
+				        each SnapshotDate,
+				        type date
+				    ),
 				
-				    AddSnapshotDate =
-				        Table.AddColumn(
-				            ChangedTypes,
-				            "snapshot_date",
-				            each p_SnapshotDate,
-				            type date
-				        ),
-				  #"Changed column type" = Table.TransformColumnTypes(AddSnapshotDate, {{"wealth_per_citizen_usd", Currency.Type}}),
-				  #"Invoked custom function" = Table.TransformColumnTypes(Table.AddColumn(#"Changed column type", "person_name_clean", each fn_CleanText([person_name])), {{"person_name_clean", type text}}),
-				  #"Invoked custom function 1" = Table.TransformColumnTypes(Table.AddColumn(#"Invoked custom function", "source_of_wealth_clean", each fn_CleanText([source_of_wealth])), {{"source_of_wealth_clean", type text}}),
-				  #"Invoked custom function 2" = Table.TransformColumnTypes(Table.AddColumn(#"Invoked custom function 1", "industry_clean", each fn_CleanText([industry])), {{"industry_clean", type text}}),
-				  #"Invoked custom function 3" = Table.TransformColumnTypes(Table.AddColumn(#"Invoked custom function 2", "state_clean", each fn_CleanText([state])), {{"state_clean", type text}}),
-				  #"Invoked custom function 4" = Table.TransformColumnTypes(Table.AddColumn(#"Invoked custom function 3", "city_clean", each fn_CleanText([city])), {{"city_clean", type text}}),
-				  #"Removed columns" = Table.RemoveColumns(#"Invoked custom function 4", {"person_name", "state", "city", "source_of_wealth", "industry"}),
-				  #"Reordered columns" = Table.ReorderColumns(#"Removed columns", {"rank", "person_name_clean", "source_of_wealth_clean", "industry_clean", "state_clean", "city_clean", "gender", "age", "iso3", "net_worth_usd", "self_made", "wealth_gdp_ratio_pct", "wealth_per_citizen_usd", "wealth_country_share_pct", "forbes_uri", "scrape_timestamp", "birth_year", "snapshot_date"}),
-				  #"Renamed columns" = Table.RenameColumns(#"Reordered columns", {{"person_name_clean", "person_name"}, {"source_of_wealth_clean", "source_of_wealth"}, {"industry_clean", "industry"}, {"state_clean", "state"}, {"city_clean", "city"}}),
-				  #"Inserted conditional column" = Table.AddColumn(#"Renamed columns", "wealth_tier", each if [net_worth_usd] < 1000000000 then "Below $1B" else if [net_worth_usd] < 5000000000 then "$1B to under $5B" else if [net_worth_usd] < 10000000000 then "$5B to under $10B" else if [net_worth_usd] < 50000000000 then "$10B to under $50B" else if [net_worth_usd] < 100000000000 then "$50B to under $100B" else "$100B+", type text),
-				  #"Added rank column" = Table.AddRankColumn(#"Inserted conditional column", "wealth_tier_sort", {{"wealth_tier", Order.Descending}}),
-				  #"Reordered columns 1" = Table.ReorderColumns(#"Added rank column", {"rank", "person_name", "source_of_wealth", "industry", "state", "city", "gender", "age", "iso3", "net_worth_usd", "self_made", "wealth_gdp_ratio_pct", "wealth_per_citizen_usd", "wealth_country_share_pct", "wealth_tier", "wealth_tier_sort", "forbes_uri", "scrape_timestamp", "birth_year", "snapshot_date"}),
-				  #"Inserted conditional column 1" = Table.AddColumn(
-				        #"Reordered columns 1",
+				    // Evaluate wealth tier label and numeric sort key in a single pass
+				    AddedWealthTierRec = Table.AddColumn(
+				        AddedSnapshotDate,
+				        "_tier_rec",
+				        each
+				            let
+				                nw = [net_worth_usd],
+				                matched = if nw = null then null else List.First(List.Select(WealthTierRules, (r) => nw >= r{0}), null)
+				            in
+				                if matched = null
+				                    then [wealth_tier = "Not disclosed", wealth_tier_sort = null]
+				                    else [wealth_tier = matched{1}, wealth_tier_sort = matched{2}]
+				    ),
+				    ExpandedWealthTier = Table.ExpandRecordColumn(
+				        AddedWealthTierRec,
+				        "_tier_rec",
+				        {"wealth_tier", "wealth_tier_sort"}
+				    ),
+				    TypedWealthTier = Table.TransformColumnTypes(
+				        ExpandedWealthTier,
+				        {
+				            {"wealth_tier", type text},
+				            {"wealth_tier_sort", Int64.Type}
+				        }
+				    ),
+				
+				    AddedAgeBand = Table.AddColumn(
+				        TypedWealthTier,
 				        "age_band",
 				        each
-				            if [age] = null then "Not disclosed"
-				            else if [age] < 30 then "Under 30"
-				            else if [age] < 40 then "30–39"
-				            else if [age] < 50 then "40–49"
-				            else if [age] < 60 then "50–59"
-				            else if [age] < 70 then "60–69"
-				            else if [age] < 80 then "70–79"
-				            else "80+",
+				            let
+				                a = [age],
+				                matched = if a = null then null else List.First(List.Select(AgeBandRules, (r) => a < r{0}), null)
+				            in
+				                if a = null then "Not disclosed"
+				                else if matched <> null then matched{1}
+				                else "80+",
 				        type text
 				    ),
-				  #"Reordered columns 2" = Table.ReorderColumns(#"Inserted conditional column 1", {"rank", "person_name", "source_of_wealth", "industry", "state", "city", "gender", "age", "age_band", "iso3", "net_worth_usd", "self_made", "wealth_gdp_ratio_pct", "wealth_per_citizen_usd", "wealth_country_share_pct", "wealth_tier", "wealth_tier_sort", "forbes_uri", "scrape_timestamp", "birth_year", "snapshot_date"}),
-				  #"Inserted conditional column 2" = Table.AddColumn(#"Reordered columns 2", "self_made_label", each if [self_made] = true then "Self-made" else "Inherited / family wealth", type text),
-				  #"Reordered columns 3" = Table.ReorderColumns(#"Inserted conditional column 2", {"rank", "person_name", "source_of_wealth", "industry", "state", "city", "gender", "age", "age_band", "iso3", "net_worth_usd", "self_made", "self_made_label", "wealth_gdp_ratio_pct", "wealth_per_citizen_usd", "wealth_country_share_pct", "wealth_tier", "wealth_tier_sort", "forbes_uri", "scrape_timestamp", "birth_year", "snapshot_date"})
+				
+				    AddedSelfMadeLabel = Table.AddColumn(
+				        AddedAgeBand,
+				        "self_made_label",
+				        each
+				            if [self_made] = null then "Not disclosed"
+				            else if [self_made] then "Self-made"
+				            else "Inherited / family wealth",
+				        type text
+				    ),
+				
+				    // =========================================
+				    // 5. FINAL COLUMN ORDER (OPTIONAL FOR UI)
+				    // =========================================
+				    FinalColumnOrder = {
+				        "rank",
+				        "person_name",
+				        "source_of_wealth",
+				        "industry",
+				        "state",
+				        "city",
+				        "gender",
+				        "age",
+				        "age_band",
+				        "iso3",
+				        "net_worth_usd",
+				        "self_made",
+				        "self_made_label",
+				        "wealth_gdp_ratio_pct",
+				        "wealth_per_citizen_usd",
+				        "wealth_country_share_pct",
+				        "wealth_tier",
+				        "wealth_tier_sort",
+				        "forbes_uri",
+				        "scrape_timestamp",
+				        "birth_year",
+				        "snapshot_date"
+				    },
+				
+				    ReorderedFinal = Table.ReorderColumns(AddedSelfMadeLabel, FinalColumnOrder)
 				in
-				    #"Reordered columns 3"
+				    ReorderedFinal
 
 	annotation PBI_ResultType = Table
 

@@ -214,9 +214,17 @@ table FactCountrySnapshot
 
 		annotation SummarizationSetBy = Automatic
 
+	column wealth_gdp_comparison
+		dataType: string
+		lineageTag: 718d6f06-80a8-48bf-953b-e25174964468
+		summarizeBy: none
+		sourceColumn: wealth_gdp_comparison
+
+		annotation SummarizationSetBy = Automatic
+
 	column top_billionaire
 		dataType: string
-		lineageTag: 28ec14d2-99b9-42c2-84d4-2226647127f0
+		lineageTag: 4d6c06d9-f6e0-49ca-8823-078e7494cb7e
 		summarizeBy: none
 		sourceColumn: top_billionaire
 
@@ -224,17 +232,9 @@ table FactCountrySnapshot
 
 	column dominant_industry_by_wealth
 		dataType: string
-		lineageTag: 8ddde917-c34e-4903-8db7-fe30f1e926d3
+		lineageTag: fbb4a0ba-9fdd-486a-8fbf-ab4ca797a90e
 		summarizeBy: none
 		sourceColumn: dominant_industry_by_wealth
-
-		annotation SummarizationSetBy = Automatic
-
-	column wealth_gdp_comparison
-		dataType: string
-		lineageTag: 718d6f06-80a8-48bf-953b-e25174964468
-		summarizeBy: none
-		sourceColumn: wealth_gdp_comparison
 
 		annotation SummarizationSetBy = Automatic
 
@@ -244,129 +244,146 @@ table FactCountrySnapshot
 		source =
 				let
 				    // =========================================
-				    // 1. SOURCE
+				    // 1. CONFIGURATION & DYNAMIC METADATA
 				    // =========================================
+				    Source = stg_BillionaireCountry,
 				
-				    Source =
-				        stg_BillionaireCountry,
+				    SnapshotDate = Date.From(p_SnapshotDate),
+				    ReferenceYear = Date.Year(SnapshotDate),
 				
-				    // =========================================
-				    // 2. SELECT COUNTRY-LEVEL FACT COLUMNS
-				    // =========================================
+				    // Single source of truth for column selection and data types
+				    ColumnSchema = {
+				        {"iso3", type text},
+				        {"country_wealth_rank", Int64.Type},
+				        {"billionaire_count", Int64.Type},
+				        {"top_billionaire", type text},
+				        {"dominant_industry_by_wealth", type text},
+				        {"total_wealth_usd_m", Currency.Type},
+				        {"total_wealth_usd", Currency.Type},
+				        {"mean_wealth_usd_m", type number},
+				        {"median_wealth_usd_m", type number},
+				        {"max_wealth_usd_m", type number},
+				        {"self_made_count", Int64.Type},
+				        {"self_made_ratio_pct", type number},
+				        {"mean_age", type number},
+				        {"country_wealth_gdp_pct", type number},
+				        {"billionaires_per_million_pop", type number},
+				        {"wealth_concentration_tier", type text},
+				        {"gdp_per_billionaire_bn", type number},
+				        {"sector_dominance_score", type number},
+				        {"gdp_usd", Currency.Type},
+				        {"population", Int64.Type},
+				        {"gdp_year", Int64.Type}
+				    },
 				
-				    SelectedColumns =
-				        Table.SelectColumns(
-				            Source,
-				            {
-				                "iso3",
-				                "country_wealth_rank",
-				                "billionaire_count",
-				                "total_wealth_usd_m",
-				                "total_wealth_usd",
-				                "mean_wealth_usd_m",
-				                "median_wealth_usd_m",
-				                "max_wealth_usd_m",
-				                "top_billionaire",
-				                "dominant_industry_by_wealth",
-				                "self_made_count",
-				                "self_made_ratio_pct",
-				                "mean_age",
-				                "country_wealth_gdp_pct",
-				                "billionaires_per_million_pop",
-				                "wealth_concentration_tier",
-				                "gdp_per_billionaire_bn",
-				                "sector_dominance_score",
-				                "gdp_usd",
-				                "population",
-				                "gdp_year"
-				            }
-				        ),
-				
-				    // =========================================
-				    // 3. STANDARDIZE COUNTRY KEY
-				    // =========================================
-				
-				    StandardizedISO3 =
-				        Table.TransformColumns(
-				            SelectedColumns,
-				            {
-				                {
-				                    "iso3",
-				                    each if _ = null
-				                        then null
-				                        else Text.Upper(Text.Trim(_)),
-				                    type nullable text
-				                }
-				            }
-				        ),
+				    // Prefix-to-sort-key mapping (avoids fragile nested if/else chains)
+				    TierSortLookup = {
+				        {"Extreme", 1},
+				        {"Very High", 2},
+				        {"High", 3},
+				        {"Moderate", 4},
+				        {"Low", 5}
+				    },
 				
 				    // =========================================
-				    // 4. APPLY DATA TYPES
+				    // 2. PROJECT & ENFORCE BASE TYPES
 				    // =========================================
-				
-				    ChangedTypes =
-				        Table.TransformColumnTypes(
-				            StandardizedISO3,
-				            {
-				                {"country_wealth_rank", Int64.Type},
-				                {"billionaire_count", Int64.Type},
-				                {"total_wealth_usd_m", Currency.Type},
-				                {"total_wealth_usd", Currency.Type},
-				                {"mean_wealth_usd_m", type number},
-				                {"median_wealth_usd_m", type number},
-				                {"max_wealth_usd_m", type number},
-				                {"top_billionaire", type text},
-				                {"dominant_industry_by_wealth", type text},
-				                {"self_made_count", Int64.Type},
-				                {"self_made_ratio_pct", type number},
-				                {"mean_age", type number},
-				                {"country_wealth_gdp_pct", type number},
-				                {"billionaires_per_million_pop", type number},
-				                {"wealth_concentration_tier", type text},
-				                {"gdp_per_billionaire_bn", type number},
-				                {"sector_dominance_score", type number},
-				                {"gdp_usd", Currency.Type},
-				                {"population", Int64.Type},
-				                {"gdp_year", Int64.Type}
-				            },
-				            "en-US"
-				        ),
+				    SelectedColumns = Table.SelectColumns(Source, List.Transform(ColumnSchema, each _{0})),
+				    TypedBase = Table.TransformColumnTypes(SelectedColumns, ColumnSchema, "en-US"),
 				
 				    // =========================================
-				    // 5. ADD SNAPSHOT DATE
+				    // 3. IN-PLACE TEXT STANDARDIZATION
 				    // =========================================
-				
-				    AddSnapshotDate =
-				        Table.AddColumn(
-				            ChangedTypes,
-				            "snapshot_date",
-				            each p_SnapshotDate,
-				            type date
-				        ),
+				    CleanedText = Table.TransformColumns(
+				        TypedBase,
+				        {
+				            {"iso3", each if _ = null then null else Text.Upper(Text.Trim(_)), type nullable text},
+				            {"top_billionaire", each if _ = null then null else fn_CleanText(_), type nullable text},
+				            {"dominant_industry_by_wealth", each if _ = null then null else fn_CleanText(_), type nullable text}
+				        }
+				    ),
 				
 				    // =========================================
-				    // 6. SORT FOR INSPECTION
+				    // 4. DERIVED BUSINESS ATTRIBUTES
 				    // =========================================
+				    AddedSnapshotDate = Table.AddColumn(
+				        CleanedText,
+				        "snapshot_date",
+				        each SnapshotDate,
+				        type date
+				    ),
 				
-				    SortedCountries =
-				        Table.Sort(
-				            AddSnapshotDate,
-				            {
-				                {"country_wealth_rank", Order.Ascending}
-				            }
-				        ),
-				  #"Inserted conditional column" = Table.AddColumn(SortedCountries, "wealth_concentration_sort", each if Text.Contains([wealth_concentration_tier], "Extreme") then 1 else if Text.Contains([wealth_concentration_tier], "Very High") then 2 else if Text.Contains([wealth_concentration_tier], "High") then 3 else if Text.Contains([wealth_concentration_tier], "Moderate") then 4 else if Text.Contains([wealth_concentration_tier], "Low") then 5 else 6, Int64.Type),
-				  #"Reordered columns" = Table.ReorderColumns(#"Inserted conditional column", {"iso3", "country_wealth_rank", "billionaire_count", "total_wealth_usd_m", "total_wealth_usd", "mean_wealth_usd_m", "median_wealth_usd_m", "max_wealth_usd_m", "top_billionaire", "dominant_industry_by_wealth", "self_made_count", "self_made_ratio_pct", "mean_age", "country_wealth_gdp_pct", "billionaires_per_million_pop", "wealth_concentration_tier", "wealth_concentration_sort", "gdp_per_billionaire_bn", "sector_dominance_score", "gdp_usd", "population", "gdp_year", "snapshot_date"}),
-				  #"Inserted conditional column 1" = Table.AddColumn(#"Reordered columns", "gdp_vintage_status", each if [gdp_year] = 2024 then "2024 reference" else if [gdp_year] = 2023 then "2023 reference" else if [gdp_year] < 2023 then "Earlier vintage – review" else if [gdp_year] > 2024 then "Future vintage – investigate" else "Missing GDP year", type text),
-				  #"Reordered columns 1" = Table.ReorderColumns(#"Inserted conditional column 1", {"iso3", "country_wealth_rank", "billionaire_count", "total_wealth_usd_m", "total_wealth_usd", "mean_wealth_usd_m", "median_wealth_usd_m", "max_wealth_usd_m", "top_billionaire", "dominant_industry_by_wealth", "self_made_count", "self_made_ratio_pct", "mean_age", "country_wealth_gdp_pct", "billionaires_per_million_pop", "wealth_concentration_tier", "wealth_concentration_sort", "gdp_per_billionaire_bn", "sector_dominance_score", "gdp_usd", "gdp_vintage_status", "population", "gdp_year", "snapshot_date"}),
-				  #"Inserted conditional column 2" = Table.TransformColumnTypes(Table.AddColumn(#"Reordered columns 1", "wealth_gdp_comparison", each if [country_wealth_gdp_pct] < 100 then "Below 100%" else "100% or above"), {{"wealth_gdp_comparison", type text}}),
-				  #"Reordered columns 2" = Table.ReorderColumns(#"Inserted conditional column 2", {"iso3", "country_wealth_rank", "billionaire_count", "total_wealth_usd_m", "total_wealth_usd", "mean_wealth_usd_m", "median_wealth_usd_m", "max_wealth_usd_m", "top_billionaire", "dominant_industry_by_wealth", "self_made_count", "self_made_ratio_pct", "mean_age", "country_wealth_gdp_pct", "wealth_gdp_comparison", "billionaires_per_million_pop", "wealth_concentration_tier", "wealth_concentration_sort", "gdp_per_billionaire_bn", "sector_dominance_score", "gdp_usd", "gdp_vintage_status", "population", "gdp_year", "snapshot_date"}),
-				  #"Invoked custom function" = Table.TransformColumnTypes(Table.AddColumn(#"Reordered columns 2", "top_billionaire_clean", each fn_CleanText([top_billionaire])), {{"top_billionaire_clean", type text}}),
-				  #"Invoked custom function 1" = Table.TransformColumnTypes(Table.AddColumn(#"Invoked custom function", "dominant_industry_by_wealth_clean", each fn_CleanText([dominant_industry_by_wealth])), {{"dominant_industry_by_wealth_clean", type text}}),
-				  #"Removed columns" = Table.RemoveColumns(#"Invoked custom function 1", {"top_billionaire", "dominant_industry_by_wealth"}),
-				  #"Reordered columns 3" = Table.ReorderColumns(#"Removed columns", {"iso3", "country_wealth_rank", "billionaire_count", "top_billionaire_clean", "dominant_industry_by_wealth_clean", "total_wealth_usd_m", "total_wealth_usd", "mean_wealth_usd_m", "median_wealth_usd_m", "max_wealth_usd_m", "self_made_count", "self_made_ratio_pct", "mean_age", "country_wealth_gdp_pct", "wealth_gdp_comparison", "billionaires_per_million_pop", "wealth_concentration_tier", "wealth_concentration_sort", "gdp_per_billionaire_bn", "sector_dominance_score", "gdp_usd", "gdp_vintage_status", "population", "gdp_year", "snapshot_date"}),
-				  #"Renamed columns" = Table.RenameColumns(#"Reordered columns 3", {{"top_billionaire_clean", "top_billionaire"}, {"dominant_industry_by_wealth_clean", "dominant_industry_by_wealth"}})
+				    AddedGdpVintage = Table.AddColumn(
+				        AddedSnapshotDate,
+				        "gdp_vintage_status",
+				        each
+				            let yr = [gdp_year]
+				            in
+				                if yr = null then "Missing GDP year"
+				                else if yr = ReferenceYear or yr = ReferenceYear - 1 then Number.ToText(yr) & " reference"
+				                else if yr < ReferenceYear - 1 then "Earlier vintage – review"
+				                else "Future vintage – investigate",
+				        type text
+				    ),
 				
+				    AddedWealthGdpComparison = Table.AddColumn(
+				        AddedGdpVintage,
+				        "wealth_gdp_comparison",
+				        each
+				            let pct = [country_wealth_gdp_pct]
+				            in
+				                if pct = null then "Not available"
+				                else if pct < 100 then "Below 100%"
+				                else "100% or above",
+				        type text
+				    ),
+				
+				    AddedConcentrationSort = Table.AddColumn(
+				        AddedWealthGdpComparison,
+				        "wealth_concentration_sort",
+				        each
+				            let
+				                tier = [wealth_concentration_tier],
+				                match = if tier = null then null else List.First(List.Select(TierSortLookup, (item) => Text.StartsWith(tier, item{0})), null)
+				            in
+				                if match = null then null else match{1},
+				        Int64.Type
+				    ),
+				
+				    // =========================================
+				    // 5. FINAL COLUMN ORDER (OPTIONAL FOR UI)
+				    // =========================================
+				    FinalColumnOrder = {
+				        "iso3",
+				        "country_wealth_rank",
+				        "billionaire_count",
+				        "top_billionaire",
+				        "dominant_industry_by_wealth",
+				        "total_wealth_usd_m",
+				        "total_wealth_usd",
+				        "mean_wealth_usd_m",
+				        "median_wealth_usd_m",
+				        "max_wealth_usd_m",
+				        "self_made_count",
+				        "self_made_ratio_pct",
+				        "mean_age",
+				        "country_wealth_gdp_pct",
+				        "wealth_gdp_comparison",
+				        "billionaires_per_million_pop",
+				        "wealth_concentration_tier",
+				        "wealth_concentration_sort",
+				        "gdp_per_billionaire_bn",
+				        "sector_dominance_score",
+				        "gdp_usd",
+				        "gdp_vintage_status",
+				        "population",
+				        "gdp_year",
+				        "snapshot_date"
+				    },
+				
+				    ReorderedFinal = Table.ReorderColumns(AddedConcentrationSort, FinalColumnOrder)
 				in
-				    #"Renamed columns"
+				    ReorderedFinal
+
+	annotation PBI_ResultType = Table
 
