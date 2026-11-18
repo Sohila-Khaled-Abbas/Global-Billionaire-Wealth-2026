@@ -79,22 +79,6 @@ table FactCountrySnapshot
 
 		annotation PBI_FormatHint = {"isGeneralNumber":true}
 
-	column top_billionaire
-		dataType: string
-		lineageTag: a6d02502-e741-4360-8716-7c5a8d4fdc82
-		summarizeBy: none
-		sourceColumn: top_billionaire
-
-		annotation SummarizationSetBy = Automatic
-
-	column dominant_industry_by_wealth
-		dataType: string
-		lineageTag: b1382ba6-902b-4c45-8b84-ff1a917fd148
-		summarizeBy: none
-		sourceColumn: dominant_industry_by_wealth
-
-		annotation SummarizationSetBy = Automatic
-
 	column self_made_count
 		dataType: int64
 		formatString: 0
@@ -230,6 +214,30 @@ table FactCountrySnapshot
 
 		annotation SummarizationSetBy = Automatic
 
+	column top_billionaire
+		dataType: string
+		lineageTag: 28ec14d2-99b9-42c2-84d4-2226647127f0
+		summarizeBy: none
+		sourceColumn: top_billionaire
+
+		annotation SummarizationSetBy = Automatic
+
+	column dominant_industry_by_wealth
+		dataType: string
+		lineageTag: 8ddde917-c34e-4903-8db7-fe30f1e926d3
+		summarizeBy: none
+		sourceColumn: dominant_industry_by_wealth
+
+		annotation SummarizationSetBy = Automatic
+
+	column wealth_gdp_comparison
+		dataType: string
+		lineageTag: 718d6f06-80a8-48bf-953b-e25174964468
+		summarizeBy: none
+		sourceColumn: wealth_gdp_comparison
+
+		annotation SummarizationSetBy = Automatic
+
 	partition FactCountrySnapshot = m
 		mode: import
 		queryGroup: 04_DataModel\Facts
@@ -350,8 +358,15 @@ table FactCountrySnapshot
 				  #"Inserted conditional column" = Table.AddColumn(SortedCountries, "wealth_concentration_sort", each if Text.Contains([wealth_concentration_tier], "Extreme") then 1 else if Text.Contains([wealth_concentration_tier], "Very High") then 2 else if Text.Contains([wealth_concentration_tier], "High") then 3 else if Text.Contains([wealth_concentration_tier], "Moderate") then 4 else if Text.Contains([wealth_concentration_tier], "Low") then 5 else 6, Int64.Type),
 				  #"Reordered columns" = Table.ReorderColumns(#"Inserted conditional column", {"iso3", "country_wealth_rank", "billionaire_count", "total_wealth_usd_m", "total_wealth_usd", "mean_wealth_usd_m", "median_wealth_usd_m", "max_wealth_usd_m", "top_billionaire", "dominant_industry_by_wealth", "self_made_count", "self_made_ratio_pct", "mean_age", "country_wealth_gdp_pct", "billionaires_per_million_pop", "wealth_concentration_tier", "wealth_concentration_sort", "gdp_per_billionaire_bn", "sector_dominance_score", "gdp_usd", "population", "gdp_year", "snapshot_date"}),
 				  #"Inserted conditional column 1" = Table.AddColumn(#"Reordered columns", "gdp_vintage_status", each if [gdp_year] = 2024 then "2024 reference" else if [gdp_year] = 2023 then "2023 reference" else if [gdp_year] < 2023 then "Earlier vintage – review" else if [gdp_year] > 2024 then "Future vintage – investigate" else "Missing GDP year", type text),
-				  #"Reordered columns 1" = Table.ReorderColumns(#"Inserted conditional column 1", {"iso3", "country_wealth_rank", "billionaire_count", "total_wealth_usd_m", "total_wealth_usd", "mean_wealth_usd_m", "median_wealth_usd_m", "max_wealth_usd_m", "top_billionaire", "dominant_industry_by_wealth", "self_made_count", "self_made_ratio_pct", "mean_age", "country_wealth_gdp_pct", "billionaires_per_million_pop", "wealth_concentration_tier", "wealth_concentration_sort", "gdp_per_billionaire_bn", "sector_dominance_score", "gdp_usd", "gdp_vintage_status", "population", "gdp_year", "snapshot_date"})
+				  #"Reordered columns 1" = Table.ReorderColumns(#"Inserted conditional column 1", {"iso3", "country_wealth_rank", "billionaire_count", "total_wealth_usd_m", "total_wealth_usd", "mean_wealth_usd_m", "median_wealth_usd_m", "max_wealth_usd_m", "top_billionaire", "dominant_industry_by_wealth", "self_made_count", "self_made_ratio_pct", "mean_age", "country_wealth_gdp_pct", "billionaires_per_million_pop", "wealth_concentration_tier", "wealth_concentration_sort", "gdp_per_billionaire_bn", "sector_dominance_score", "gdp_usd", "gdp_vintage_status", "population", "gdp_year", "snapshot_date"}),
+				  #"Inserted conditional column 2" = Table.TransformColumnTypes(Table.AddColumn(#"Reordered columns 1", "wealth_gdp_comparison", each if [country_wealth_gdp_pct] < 100 then "Below 100%" else "100% or above"), {{"wealth_gdp_comparison", type text}}),
+				  #"Reordered columns 2" = Table.ReorderColumns(#"Inserted conditional column 2", {"iso3", "country_wealth_rank", "billionaire_count", "total_wealth_usd_m", "total_wealth_usd", "mean_wealth_usd_m", "median_wealth_usd_m", "max_wealth_usd_m", "top_billionaire", "dominant_industry_by_wealth", "self_made_count", "self_made_ratio_pct", "mean_age", "country_wealth_gdp_pct", "wealth_gdp_comparison", "billionaires_per_million_pop", "wealth_concentration_tier", "wealth_concentration_sort", "gdp_per_billionaire_bn", "sector_dominance_score", "gdp_usd", "gdp_vintage_status", "population", "gdp_year", "snapshot_date"}),
+				  #"Invoked custom function" = Table.TransformColumnTypes(Table.AddColumn(#"Reordered columns 2", "top_billionaire_clean", each fn_CleanText([top_billionaire])), {{"top_billionaire_clean", type text}}),
+				  #"Invoked custom function 1" = Table.TransformColumnTypes(Table.AddColumn(#"Invoked custom function", "dominant_industry_by_wealth_clean", each fn_CleanText([dominant_industry_by_wealth])), {{"dominant_industry_by_wealth_clean", type text}}),
+				  #"Removed columns" = Table.RemoveColumns(#"Invoked custom function 1", {"top_billionaire", "dominant_industry_by_wealth"}),
+				  #"Reordered columns 3" = Table.ReorderColumns(#"Removed columns", {"iso3", "country_wealth_rank", "billionaire_count", "top_billionaire_clean", "dominant_industry_by_wealth_clean", "total_wealth_usd_m", "total_wealth_usd", "mean_wealth_usd_m", "median_wealth_usd_m", "max_wealth_usd_m", "self_made_count", "self_made_ratio_pct", "mean_age", "country_wealth_gdp_pct", "wealth_gdp_comparison", "billionaires_per_million_pop", "wealth_concentration_tier", "wealth_concentration_sort", "gdp_per_billionaire_bn", "sector_dominance_score", "gdp_usd", "gdp_vintage_status", "population", "gdp_year", "snapshot_date"}),
+				  #"Renamed columns" = Table.RenameColumns(#"Reordered columns 3", {{"top_billionaire_clean", "top_billionaire"}, {"dominant_industry_by_wealth_clean", "dominant_industry_by_wealth"}})
 				
 				in
-				    #"Reordered columns 1"
+				    #"Renamed columns"
 
