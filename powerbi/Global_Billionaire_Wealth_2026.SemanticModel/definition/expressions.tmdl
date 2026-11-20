@@ -5533,9 +5533,81 @@ expression stg_ForbesLive =
 		    else
 		        Table.ExpandRecordColumn(#"Converted to table", "Column1", FieldNames),
 		  #"Changed column type" = Table.TransformColumnTypes(#"Expanded Column1", {{"rank", Int64.Type}, {"uri", type text}, {"name", type text}, {"gender", type text}, {"age", Int64.Type}, {"networth", type number}, {"citizenship", type text}}),
-		  #"Renamed columns" = Table.RenameColumns(#"Changed column type", {{"rank", "source_rank"}, {"uri", "forbes_uri"}, {"name", "source_person_name"}, {"gender", "source_gender_code"}, {"age", "source_age_years"}, {"networth", "source_networth_usd_m"}, {"citizenship", "source_citizenship_iso2"}, {"industry", "source_industry_list"}, {"source", "source_wealth_list"}})
+		  #"Renamed columns" = Table.RenameColumns(#"Changed column type", {{"rank", "source_rank"}, {"uri", "forbes_uri"}, {"name", "source_person_name"}, {"gender", "source_gender_code"}, {"age", "source_age_years"}, {"networth", "source_networth_usd_m"}, {"citizenship", "source_citizenship_code"}, {"industry", "source_industry_list"}, {"source", "source_wealth_list"}})
 		in
 		    #"Renamed columns"
 	lineageTag: c881530b-1dde-4817-b625-07b4f65c6559
 	queryGroup: 02_Staging
+
+expression src_ForbesApiUpdated =
+		let
+		    Source = Web.Contents(
+		        "https://raw.githubusercontent.com",
+		        [
+		            RelativePath = "komed3/rtb-api/main/api/updated",
+		            Timeout = #duration(0, 0, 5, 0),
+		            Headers = [Accept = "application/json"]
+		        ]
+		    ),
+		
+		    // Decode UTF-8 binary and strip trailing newlines or surrounding JSON quotes
+		    RawText = Text.FromBinary(Source, TextEncoding.Utf8),
+		    CleanText = Text.Trim(RawText, {" ", "#(cr)", "#(lf)", "#(tab)", """"}),
+		
+		    // Parse ISO 8601 timestamp with UTC offset into a native datetimezone scalar
+		    UpdatedAt = DateTimeZone.FromText(CleanText, "en-US")
+		in
+		    UpdatedAt
+	lineageTag: fa062562-5377-481c-b362-003cb596a9f2
+	queryGroup: 01_Source
+
+	annotation PBI_ResultType = Table
+
+expression src_ForbesCountryIndex =
+		let
+		    Source = Web.Contents(
+		        "https://raw.githubusercontent.com",
+		        [
+		            RelativePath = "komed3/rtb-api/main/api/filter/country/_index",
+		            Timeout = #duration(0, 0, 5, 0),
+		            Headers = [Accept = "application/json"]
+		        ]
+		    ),
+		    ParsedJson = Json.Document(Source, 65001),
+		    ValidatedRecord = if Value.Is(ParsedJson, type record) then
+		        ParsedJson
+		    else
+		        error Error.Record(
+		            "InvalidSchema",
+		            "Expected root JSON type to be Record for src_ForbesCountryIndex.",
+		            Value.Type(ParsedJson)
+		        )
+		in
+		    ValidatedRecord
+	lineageTag: b5116ed8-98ca-4082-b204-8bd5095b5415
+	queryGroup: 01_Source
+
+expression src_ForbesIndustryIndex =
+		let
+		    Source = Web.Contents(
+		        "https://raw.githubusercontent.com",
+		        [
+		            RelativePath = "komed3/rtb-api/main/api/filter/industry/_index",
+		            Timeout = #duration(0, 0, 5, 0),
+		            Headers = [Accept = "application/json"]
+		        ]
+		    ),
+		    ParsedJson = Json.Document(Source, 65001),
+		    ValidatedRecord = if Value.Is(ParsedJson, type record) then
+		        ParsedJson
+		    else
+		        error Error.Record(
+		            "InvalidSchema",
+		            "Expected root JSON type to be Record for src_ForbesIndustryIndex.",
+		            Value.Type(ParsedJson)
+		        )
+		in
+		    ValidatedRecord
+	lineageTag: c87c2035-7573-4b54-a3a8-c75c0c5e6f6e
+	queryGroup: 01_Source
 
