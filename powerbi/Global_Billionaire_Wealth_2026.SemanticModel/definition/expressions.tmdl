@@ -6366,3 +6366,312 @@ expression int_ForbesIndustryBridge =
 	lineageTag: 35f1e394-a0ec-443f-81b4-95ea466ddf60
 	queryGroup: 03_Transformations
 
+expression qa_ForbesLiveMissingURI =
+		let
+		    Source = stg_ForbesLive,
+		
+		    // 1. Single source of truth for the audited key and context columns
+		    KeyColumn = "forbes_uri",
+		    ContextColumns = {"source_rank", "source_person_name"},
+		    RequiredColumns = List.Distinct(ContextColumns & {KeyColumn}),
+		
+		    // 2. Project and order columns in one step (Table.SelectColumns already preserves list order)
+		    SelectedColumns = Table.SelectColumns(Source, RequiredColumns, MissingField.UseNull),
+		
+		    // 3. Dynamically inspect the target key column for null, empty, or whitespace-only values
+		    FilteredMissingKeys = Table.SelectRows(
+		        SelectedColumns,
+		        (row) =>
+		            let
+		                RawVal = Record.Field(row, KeyColumn),
+		                CleanVal = if RawVal = null then null else Text.Trim(Text.Clean(try Text.From(RawVal) otherwise "[NonScalar]"))
+		            in
+		                CleanVal = null or CleanVal = ""
+		    )
+		in
+		    FilteredMissingKeys
+	lineageTag: dc10d6f8-423b-41d7-8550-2944806711f7
+	queryGroup: '05_QA & Reconciliation'
+
+expression qa_ForbesLiveDuplicateURI =
+		let
+		    Source = stg_ForbesLive,
+		
+		    // 1. Single source of truth for the audited key and output count column
+		    KeyColumn = "forbes_uri",
+		    CountColumn = "URI_Row_Count",
+		
+		    // 2. Project only the target key column safely
+		    SelectedKey = Table.SelectColumns(Source, {KeyColumn}, MissingField.UseNull),
+		
+		    // 3. Normalize whitespace and casing to match Power BI's case-insensitive VertiPaq engine
+		    NormalizedKey = Table.TransformColumns(
+		        SelectedKey,
+		        {
+		            {
+		                KeyColumn,
+		                each if _ = null then null else Text.Lower(Text.Trim(Text.Clean(Text.From(_)))),
+		                type nullable text
+		            }
+		        }
+		    ),
+		
+		    // 4. Exclude null/blank keys so missing values are not misreported as duplicate keys
+		    ValidKeys = Table.SelectRows(
+		        NormalizedKey,
+		        each Record.Field(_, KeyColumn) <> null and Record.Field(_, KeyColumn) <> ""
+		    ),
+		
+		    // 5. Group dynamically, filter for collisions, and surface worst offenders first
+		    GroupedKeys = Table.Group(
+		        ValidKeys,
+		        {KeyColumn},
+		        {{CountColumn, each Table.RowCount(_), Int64.Type}}
+		    ),
+		    DuplicateKeys = Table.SelectRows(
+		        GroupedKeys,
+		        each Record.Field(_, CountColumn) > 1
+		    ),
+		    SortedDuplicates = Table.Sort(DuplicateKeys, {{CountColumn, Order.Descending}})
+		in
+		    SortedDuplicates
+	lineageTag: b6b4df01-af0d-44bb-b17a-b9402ee0f3c1
+	queryGroup: '05_QA & Reconciliation'
+
+expression qa_ForbesLiveOnly =
+		let
+		    Source = int_ForbesLivePersonKeys,
+		
+		    // 1. Buffer only the distinct normalized baseline keys for a fast anti-join
+		    BufferedBaselineKeys = Table.Buffer(
+		        Table.Distinct(
+		            Table.SelectRows(
+		                Table.TransformColumns(
+		                    Table.SelectColumns(FactBillionaire, {"forbes_uri"}),
+		                    {
+		                        {
+		                            "forbes_uri",
+		                            each if _ = null then null else Text.Lower(Text.Trim(Text.Clean(_))),
+		                            type nullable text
+		                        }
+		                    }
+		                ),
+		                each [forbes_uri] <> null and [forbes_uri] <> ""
+		            ),
+		            {"forbes_uri"}
+		        )
+		    ),
+		
+		    // 2. Left Anti Join retains live profiles absent from the April baseline
+		    AntiJoined = Table.NestedJoin(
+		        Source,
+		        {"forbes_uri"},
+		        BufferedBaselineKeys,
+		        {"forbes_uri"},
+		        "BaselineMatch",
+		        JoinKind.LeftAnti
+		    ),
+		
+		    // 3. Project only the 6 required QA columns (automatically drops the empty join column)
+		    SelectedColumns = Table.SelectColumns(
+		        AntiJoined,
+		        {
+		            "source_rank",
+		            "forbes_uri",
+		            "source_person_name",
+		            "source_age_years",
+		            "source_networth_usd_m",
+		            "source_citizenship_code"
+		        }
+		    )
+		in
+		    SelectedColumns
+	lineageTag: d91fa7a3-16b0-41ab-86e0-306636e415b1
+	queryGroup: '05_QA & Reconciliation'
+
+expression qa_BaselineNotInNovember =
+		let
+		    // 1. Project required baseline columns early and normalize URI for accurate matching
+		    Source = Table.TransformColumns(
+		        Table.SelectColumns(
+		            FactBillionaire,
+		            {
+		                "rank",
+		                "forbes_uri",
+		                "person_name",
+		                "iso3",
+		                "net_worth_usd",
+		                "snapshot_date"
+		            }
+		        ),
+		        {
+		            {
+		                "forbes_uri",
+		                each if _ = null then null else Text.Lower(Text.Trim(Text.Clean(_))),
+		                type nullable text
+		            }
+		        }
+		    ),
+		
+		    // 2. Buffer distinct non-null live URIs in memory
+		    BufferedLiveKeys = Table.Buffer(
+		        Table.Distinct(
+		            Table.SelectRows(
+		                Table.SelectColumns(int_ForbesLivePersonKeys, {"forbes_uri"}),
+		                each [forbes_uri] <> null and [forbes_uri] <> ""
+		            ),
+		            {"forbes_uri"}
+		        )
+		    ),
+		
+		    // 3. Left Anti Join retains April baseline profiles absent from the live snapshot
+		    AntiJoined = Table.NestedJoin(
+		        Source,
+		        {"forbes_uri"},
+		        BufferedLiveKeys,
+		        {"forbes_uri"},
+		        "LiveMatch",
+		        JoinKind.LeftAnti
+		    ),
+		
+		    // 4. Remove the empty nested join column
+		    CleanedOutput = Table.RemoveColumns(AntiJoined, {"LiveMatch"})
+		in
+		    CleanedOutput
+	lineageTag: db7a891f-65ba-4862-b664-7aceb5e2d663
+	queryGroup: '05_QA & Reconciliation'
+
+expression int_ForbesLivePersonKeys =
+		let
+		    Source = stg_ForbesLive,
+		
+		    // 1. Project only the 7 required live person columns early
+		    SelectedColumns = Table.SelectColumns(
+		        Source,
+		        {
+		            "source_rank",
+		            "forbes_uri",
+		            "source_person_name",
+		            "source_gender_code",
+		            "source_age_years",
+		            "source_networth_usd_m",
+		            "source_citizenship_code"
+		        }
+		    ),
+		
+		    // 2. Enforce explicit data types without deduplicating
+		    TypedColumns = Table.TransformColumnTypes(
+		        SelectedColumns,
+		        {
+		            {"source_rank", Int64.Type},
+		            {"forbes_uri", type text},
+		            {"source_person_name", type text},
+		            {"source_gender_code", type text},
+		            {"source_age_years", Int64.Type},
+		            {"source_networth_usd_m", type number},
+		            {"source_citizenship_code", type text}
+		        },
+		        "en-US"
+		    ),
+		
+		    // 3. Normalize URI casing/whitespace so case-sensitive M joins do not miss valid matches
+		    NormalizedUri = Table.TransformColumns(
+		        TypedColumns,
+		        {
+		            {
+		                "forbes_uri",
+		                each if _ = null then null else Text.Lower(Text.Trim(Text.Clean(_))),
+		                type nullable text
+		            }
+		        }
+		    )
+		in
+		    NormalizedUri
+	lineageTag: 512e3db3-b080-4930-add7-82e5e3f1d9cc
+	queryGroup: 03_Transformations
+
+expression int_ForbesLiveBaselineReconciliation =
+		let
+		    Source = int_ForbesLivePersonKeys,
+		
+		    // 1. Project only required baseline fields, normalize URI, exclude null keys, and buffer in RAM
+		    BufferedBaseline = Table.Buffer(
+		        Table.Distinct(
+		            Table.SelectRows(
+		                Table.TransformColumns(
+		                    Table.SelectColumns(
+		                        FactBillionaire,
+		                        {
+		                            "forbes_uri",
+		                            "rank",
+		                            "person_name",
+		                            "gender",
+		                            "age",
+		                            "iso3",
+		                            "net_worth_usd",
+		                            "industry",
+		                            "snapshot_date"
+		                        }
+		                    ),
+		                    {
+		                        {
+		                            "forbes_uri",
+		                            each if _ = null then null else Text.Lower(Text.Trim(Text.Clean(_))),
+		                            type nullable text
+		                        }
+		                    }
+		                ),
+		                each [forbes_uri] <> null and [forbes_uri] <> ""
+		            ),
+		            {"forbes_uri"}
+		        )
+		    ),
+		
+		    // 2. Left Outer Join live profiles against the April baseline
+		    MergedBaseline = Table.NestedJoin(
+		        Source,
+		        {"forbes_uri"},
+		        BufferedBaseline,
+		        {"forbes_uri"},
+		        "BaselineMatch",
+		        JoinKind.LeftOuter
+		    ),
+		
+		    // 3. Expand baseline fields with explicit baseline_ prefixes
+		    ExpandedBaseline = Table.ExpandTableColumn(
+		        MergedBaseline,
+		        "BaselineMatch",
+		        {
+		            "rank",
+		            "person_name",
+		            "gender",
+		            "age",
+		            "iso3",
+		            "net_worth_usd",
+		            "industry",
+		            "snapshot_date"
+		        },
+		        {
+		            "baseline_rank",
+		            "baseline_person_name",
+		            "baseline_gender",
+		            "baseline_age",
+		            "baseline_iso3",
+		            "baseline_net_worth_usd",
+		            "baseline_industry",
+		            "baseline_snapshot_date"
+		        }
+		    ),
+		
+		    // 4. Classify match status using baseline_rank
+		    AddedMatchStatus = Table.AddColumn(
+		        ExpandedBaseline,
+		        "baseline_match_status",
+		        each if [baseline_rank] = null then "New to April baseline" else "Matched to April baseline",
+		        type text
+		    )
+		in
+		    AddedMatchStatus
+	lineageTag: b43f6a31-8dd5-41f4-95a5-0feaa523874f
+	queryGroup: 03_Transformations
+
