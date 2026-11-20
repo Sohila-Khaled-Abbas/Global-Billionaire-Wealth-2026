@@ -5478,3 +5478,33 @@ expression tmp_DimCountryEnrichmentValidation =
 	lineageTag: 744e78a7-8562-4c89-8cd3-37713ffacf53
 	queryGroup: 99_Archive
 
+expression src_ForbesLiveRoot =
+		let
+		    // Generate today's date in YYYY-MM-DD format (UTC avoids local machine vs. cloud service drift)
+		    TodayText = Date.ToText(Date.From(DateTimeZone.UtcNow()), "yyyy-MM-dd"),
+		
+		    // Use RelativePath so Power BI Service does not flag this as an unrefreshable dynamic data source
+		    Source = Web.Contents(
+		        "https://raw.githubusercontent.com",
+		        [
+		            RelativePath = "komed3/rtb-api/main/api/list/rtb/" & TodayText,
+		            Timeout = #duration(0, 0, 5, 0),
+		            Headers = [Accept = "application/json"]
+		        ]
+		    ),
+		
+		    // Parse the binary stream directly as JSON instead of splitting by line breaks
+		    ParsedJson = Json.Document(Source, 65001),
+		
+		    // Convert to a table depending on whether the root JSON is an array (list) or an object (record)
+		    OutputTable = if Value.Is(ParsedJson, type list) then
+		        Table.FromList(ParsedJson, Splitter.SplitByNothing(), null, null, ExtraValues.Error)
+		    else
+		        Record.ToTable(ParsedJson)
+		in
+		    OutputTable
+	lineageTag: 55268e20-ec72-4e6b-a043-1238140b5cec
+	queryGroup: 01_Source
+
+	annotation PBI_ResultType = Table
+
