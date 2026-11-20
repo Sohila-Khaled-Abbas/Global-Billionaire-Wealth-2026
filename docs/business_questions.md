@@ -109,3 +109,26 @@ This analytical project investigates global wealth concentration, capital accumu
   - In Mexico, Carlos Slim Helù & family represent **48.4%** of Mexican billionaire wealth (6.87% of Mexico's GDP).
   - In France, Bernard Arnault & family represent **25.6%** of French billionaire wealth (4.79% of France's GDP).
   - In the United States, Elon Musk's wealth ($800.6B) equals **9.6%** of total US billionaire wealth and **2.78%** of total US GDP.
+
+---
+
+## 5. Granular Slicing with Derived Business Attributes
+
+### Q9: How is extreme capital stratified across discrete wealth tiers?
+- **Analytical Objective**: Segment fortunes using the modeled `FactBillionaire[wealth_tier]` attribute sorted by `FactBillionaire[wealth_tier_sort]`.
+- **Key Findings**:
+  - **Mega-Centibillionaires ($100B+)**: Represent the ultra-elite apex (under 20 individuals worldwide), predominantly US tech titans and European luxury magnates.
+  - **Decabillionaires ($10B to under $50B)**: The dominant cohort driving cross-industry expansion.
+  - **Single-Digit Billionaires ($1B to under $5B)**: Form the broad statistical base of the pyramid (>75% of global headcount).
+
+### Q10: What does demographic cohorting reveal about generational wealth compounding velocity?
+- **Analytical Objective**: Analyze headcounts and total net worth across `FactBillionaire[age_band]` cohorts (`Under 30`, `30–39`, `40–49`, `50–59`, `60–69`, `70–79`, `80+`).
+- **Key Findings**:
+  - The `Under 30` and `30–39` cohorts are overwhelmingly concentrated in Technology and digital asset creation, exhibiting rapid compounding velocity.
+  - The `60–69` and `70–79` cohorts represent the peak volume of global capital accumulation, combining mature entrepreneurial enterprises with consolidated inherited estates.
+
+### Q11: Which sovereign jurisdictions surpass the 100% Wealth-to-GDP threshold?
+- **Analytical Objective**: Filter `FactCountrySnapshot` by `wealth_gdp_comparison = "100% or above"`.
+- **Key Findings**:
+  - Five sovereign entities exhibit cumulative billionaire wealth exceeding 100% of annual economic output: St. Kitts and Nevis (860.7%), Eswatini (362.6%), Cyprus (148.7%), Belize (114.8%), and Hong Kong SAR (103.9%).
+  - Monitored via `FactCountrySnapshot[gdp_vintage_status]` to ensure reference year transparency (including Liechtenstein's 2022 historical exception).

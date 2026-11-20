@@ -37,6 +37,13 @@ The semantic model includes automated validation queries executed directly in Po
 | `qa_CountryReconciliation` | Reconciles individual sums vs. country aggregate sums. | Exact balance ($19.64T) | Passed |
 | `tmp_GalaxyFactReconciliation` | Cross-fact outer join audit comparing `FactBillionaire` and `FactCountrySnapshot` by `iso3`. | 0 mismatches across all 80 countries | Passed |
 | `tmp_GalaxyFactReconciliationSummary` | High-level scorecard summarizing galaxy schema reconciliation KPIs. | 100% Passed across 7 core metrics | Passed |
+| `tmp_SourceSchemaContract` | Automated schema contract verifying all required columns and invariant types. | All schema contracts satisfied | Passed |
+| `tmp_SnapshotProvenanceValidation` | Cross-validates analytical snapshot date anchors across all model facts. | Single source of truth confirmed | Passed |
+| `tmp_SnapshotProvenanceDetail` | Granular audit of snapshot dates, UTC timestamps, and data vintages. | 0 timestamp anomalies | Passed |
+| `tmp_GDPVintageExceptionDetail` | Audits Liechtenstein 2022 GDP historical vintage and monitors reference years. | Documented vintage exception verified | Passed |
+| `tmp_FinalFactGrainValidation` | Primary key uniqueness and grain validation for `FactBillionaire` and `FactCountrySnapshot`. | Strict grain enforcement (0 duplicates) | Passed |
+| `tmp_FunctionLibraryValidation` | Unit test suite verifying M functions (`fn_CleanText`, `fn_NormalizeISO3`, `fn_SafeDivide`). | 100% function test pass rate | Passed |
+| `tmp_DimCountryEnrichmentValidation` | Validates composite display labels and country name alignment flags. | 0 null display labels | Passed |
 
 ---
 

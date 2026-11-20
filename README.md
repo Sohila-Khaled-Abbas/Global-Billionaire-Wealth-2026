@@ -107,15 +107,19 @@ The Power BI Semantic Model implements a star/snowflake dimensional model author
 
 </div>
 
-### 🧩 Table Catalog & Cardinality
+### 🧩 Table Catalog & Dimensional Schema
 
-| Table Name | Role | Primary Key | Foreign Keys | Record Count | Description |
-| :--- | :---: | :---: | :---: | :---: | :--- |
-| **`DimCountry`** | Dimension | `iso3` | — | 80 | Standardized sovereign countries and territories (`iso3`, `country`, `wb_country_name`). |
-| **`DimIndustry`** | Dimension | `industry` | — | 18 | Standardized global economic industry classifications. |
-| **`FactBillionaire`** | Fact | `rank` | `iso3`, `industry` | 3,384 | Granular micro fortunes with age, gender, state, city, net worth, source of wealth, and self-made flag. |
-| **`FactCountrySnapshot`** | Fact | `iso3` | `iso3` (1:1 Both) | 80 | Macroeconomic sovereign metrics: GDP, population, total wealth, mean/median wealth, and wealth tiers. |
-| **`_Measures`** | Measure Home | — | — | — | Centralized repository for all DAX measures (`Billionaire Count`, `Total Wealth USD`). |
+| Table Name | Role | Primary Key | Foreign Keys | Columns | Record Count | Description & Key Attributes |
+| :--- | :---: | :---: | :---: | :---: | :---: | :--- |
+| **`DimCountry`** | Conformed Dimension | `iso3` | — | 5 | 80 | Standardized sovereign entities (`iso3`, `country`, `wb_country_name`), enriched with composite display labels (`country_display_label`) and cross-system alignment flags (`country_name_alignment`). |
+| **`DimIndustry`** | Natural Dimension | `industry` | — | 1 | 18 | Standardized global economic industry classifications deduplicated and cleaned via `fn_CleanText`. |
+| **`FactBillionaire`** | Transaction Fact | `rank` | `iso3` (Many-to-1) | 22 | 3,384 | Granular micro fortunes with net worth, demographics, geography, self-made classification, plus derived cohorts: `wealth_tier` ($100B+ down to Below $1B with sort key), `age_band` (7 demographic brackets), and `self_made_label`. |
+| **`FactCountrySnapshot`** | Macro Fact | `iso3` | `iso3` (1:1 Both) | 25 | 80 | Macroeconomic sovereign metrics: GDP, population, total wealth, mean/median wealth, density, dominance scores, plus derived attributes: `gdp_vintage_status`, `wealth_gdp_comparison` ($\ge 100\%$), and `wealth_concentration_sort`. |
+| **`_Measures`** | Measure Container | — | — | — | — | Centralized repository for production DAX measures (`Billionaire Count`, `Total Billionaire Wealth USD`). |
+
+#### 🔗 Model Relationships & Cardinality
+- **`FactBillionaire` $\to$ `DimCountry`**: Many-to-One (`* : 1`) single-directional relationship on `iso3`.
+- **`FactCountrySnapshot` $\leftrightarrow$ `DimCountry`**: One-to-One (`1 : 1`) bidirectional cross-filtering on `iso3`.
 
 ---
 
@@ -143,15 +147,24 @@ To ensure high data integrity and prevent many-to-many Cartesian explosion, the 
 
 ## 🔍 Power Query Engineering & QA Audit Framework
 
-The Power BI project incorporates a structured Power Query ETL pipeline organized into 7 query groups:
+The Power BI project incorporates a structured Power Query ETL pipeline authored across 7 organized query groups with 65 tracked expressions:
 
-- **`00_Parameters & Functions`**: Centralized configuration (`p_DataFolderPath`, `p_SnapshotDate`) and re-usable text standardization functions (`fn_StandardizeCountry`, `fn_ParseIndustries`).
+- **`00_Parameters & Functions`**: 
+  - Dynamic parameters: `p_DataFolderPath` and `p_SnapshotDate` (`2026-04-10`).
+  - Production M function library: `fn_CleanText` (whitespace trimming & non-printable character removal), `fn_NormalizeISO3` (null-safe 3-character uppercase ISO standardization), `fn_SafeDivide` (division-by-zero protection), `fn_StandardizeCountry`, and `fn_ParseIndustries`.
 - **`01_Source`**: Parameterized raw CSV connectors (`src_BillionaireIndividual`, `src_BillionaireCountry`).
-- **`02_Staging`**: Type-coerced and validated staging queries (`stg_BillionaireIndividual`, `stg_BillionaireCountry`).
-- **`03_Transformations`**: Industry bridge table generation (`int_BillionaireIndustryBridge`, `int_IndustryLookup`).
-- **`04_DataModel`**: Production dimension and fact tables (`DimCountry`, `DimIndustry`, `FactBillionaire`, `FactCountrySnapshot`).
-- **`05_QA & Reconciliation`**: 17 automated audit queries verifying key uniqueness, zero orphaned foreign keys, rank consistency, and balance sheet reconciliation ($19.64 Trillion exact match).
-- **`99_Archive`**: Legacy and staging archive tables.
+- **`02_Staging`**: Type-coerced, null-sanitized staging queries enforcing strict schema contracts (`stg_BillionaireIndividual`, `stg_BillionaireCountry`).
+- **`03_Transformations`**: Industry bridge table generation and deduplicated industry lookup (`int_BillionaireIndustryBridge`, `int_IndustryLookup`).
+- **`04_DataModel`**: Production dimensions (`DimCountry`, `DimIndustry`) and facts (`FactBillionaire`, `FactCountrySnapshot`).
+- **`05_QA & Reconciliation`**: Automated continuous audit suite:
+  - `tmp_SourceSchemaContract`: Schema invariant checks ensuring column names and types match specifications.
+  - `tmp_SnapshotProvenanceValidation` & `tmp_SnapshotProvenanceDetail`: Cross-table snapshot date and timestamp verification.
+  - `tmp_GDPVintageExceptionDetail`: Audits historical reference years, explicitly documenting Liechtenstein 2022 GDP observation.
+  - `tmp_FinalFactGrainValidation`: Enforces strict primary key uniqueness across `FactBillionaire` (`rank`) and `FactCountrySnapshot` (`iso3`).
+  - `tmp_FunctionLibraryValidation`: Automated test harness for M transformation functions.
+  - `tmp_DimCountryEnrichmentValidation`: Audits composite display labels and nomenclature alignment flags.
+  - `tmp_GalaxyFactReconciliation` & `qa_CountryReconciliation`: Verifies 100% referential integrity and exact balance sheet parity ($19.64 Trillion exact match across micro and macro grains).
+- **`99_Archive`**: Legacy connectors and staging archive queries.
 
 ---
 
@@ -307,7 +320,7 @@ Deep-dive documentation available in [`docs/`](docs/):
 | Resource | Scope & Purpose |
 | :--- | :--- |
 | 📘 [Data Dictionary](docs/data_dictionary.md) | Full dimensional schema dictionary (`DimCountry`, `DimIndustry`, `FactBillionaire`, `FactCountrySnapshot`). |
-| ❓ [Business Questions](docs/business_questions.md) | Detailed analysis of 8 core macroeconomic research questions with DAX formulations. |
+| ❓ [Business Questions](docs/business_questions.md) | Detailed analysis of 11 core macroeconomic and demographic research questions with DAX formulations. |
 | 🛡️ [Data Quality Log](docs/data_quality_log.md) | Audit logs, Power Query QA queries, fallen billionaire handling, and outlier registry. |
 | 🔬 [Methodology & Limitations](docs/methodology_and_limitations.md) | Economic stock vs. flow analysis, residency distortions, and valuation constraints. |
 

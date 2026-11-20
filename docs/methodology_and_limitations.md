@@ -25,13 +25,14 @@ The analytics platform merges two independent authoritative tiers of financial a
 To transition from raw flat CSV records into an enterprise-ready analytical model, the solution employs a dimensional architecture:
 
 1. **Dimensional Isolation**:
-   - Standardized `DimCountry` isolates country-level surrogate and natural keys (`iso3`, `country`, `wb_country_name`).
-   - `DimIndustry` isolates the 18 distinct primary industries parsed from comma-delimited strings via `fn_ParseIndustries`.
-2. **Grain Separation**:
-   - `FactBillionaire` models the micro-level grain (individual wealth, age, gender, state, city, self-made status).
-   - `FactCountrySnapshot` models the macro-level grain (national GDP, population, wealth tiers, sector dominance scores).
-3. **Automated Quality Gate**:
-   - 17 automated QA queries in query group `05_QA & Reconciliation` audit referential integrity, duplicate ranks, and balance-sheet consistency during data refresh.
+   - Standardized `DimCountry` isolates country-level surrogate and natural keys (`iso3`, `country`, `wb_country_name`) along with UI-optimized composite display labels (`country_display_label`) and cross-system alignment flags (`country_name_alignment`).
+   - `DimIndustry` isolates the 18 distinct primary industries parsed from comma-delimited strings and cleaned via `fn_CleanText`.
+2. **Grain Separation & Business Attribute Enrichment**:
+   - `FactBillionaire` models the micro-level grain across 3,384 individuals (individual net worth, age, birth year, gender, geographic location, source of wealth, and self-made flag), enriched with discrete analytical cohorts (`wealth_tier`, `wealth_tier_sort`, `age_band`, `self_made_label`) and national ratio benchmarks (`wealth_gdp_ratio_pct`, `wealth_per_citizen_usd`, `wealth_country_share_pct`).
+   - `FactCountrySnapshot` models the macro-level sovereign grain across 80 economies (national GDP, population, aggregate wealth, mean/median/max wealth, billionaire density, and sector dominance scores), enriched with concentration tiers (`wealth_concentration_tier`, `wealth_concentration_sort`), threshold flags (`wealth_gdp_comparison`), and reference vintage auditing (`gdp_vintage_status`).
+3. **Automated Quality Gate & M Function Library**:
+   - Reusable M function library (`fn_CleanText`, `fn_NormalizeISO3`, `fn_SafeDivide`, `fn_StandardizeCountry`, `fn_ParseIndustries`) standardizes incoming text and prevents runtime errors.
+   - Comprehensive automated QA queries in query group `05_QA & Reconciliation` (including `tmp_SourceSchemaContract`, `tmp_SnapshotProvenanceValidation`, `tmp_GDPVintageExceptionDetail`, `tmp_FinalFactGrainValidation`, `tmp_FunctionLibraryValidation`, `tmp_DimCountryEnrichmentValidation`, and `tmp_GalaxyFactReconciliation`) continuously audit schema contracts, referential integrity, primary key uniqueness, and exact balance-sheet reconciliation ($19.64 Trillion match).
 
 ---
 
