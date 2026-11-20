@@ -5723,3 +5723,104 @@ expression stg_ForbesIndustryIndex =
 	lineageTag: 739580b3-9a5d-430d-828f-55345b6eb821
 	queryGroup: 02_Staging
 
+expression src_ISO3166CountryCodes =
+		let
+		    Source = Web.Contents(
+		        "https://raw.githubusercontent.com",
+		        [
+		            RelativePath = "datasets/country-codes/main/data/country-codes.csv",
+		            Timeout = #duration(0, 0, 5, 0)
+		        ]
+		    ),
+		    ParsedCsv = Csv.Document(
+		        Source,
+		        [
+		            Delimiter = ",",
+		            Encoding = 65001,
+		            QuoteStyle = QuoteStyle.Csv
+		        ]
+		    ),
+		    PromotedHeaders = Table.PromoteHeaders(ParsedCsv, [PromoteAllScalars = true]),
+		
+		    // Dynamically cast all columns to text at the source layer so unused upstream
+		    // columns (e.g., GAUL, EDGAR) cannot break refresh if renamed or reordered
+		    AllColumns = Table.ColumnNames(PromotedHeaders),
+		    TypedAsText = Table.TransformColumnTypes(
+		        PromotedHeaders,
+		        List.Transform(AllColumns, each {_, type text})
+		    )
+		in
+		    TypedAsText
+	lineageTag: 94e73dc0-a046-41fa-a1f0-0ab810f59cd1
+	queryGroup: 01_Source
+
+	annotation PBI_ResultType = Table
+
+expression ref_ForbesCountryCodeExceptions =
+		let
+		    Source = #table(
+		        type table [
+		            source_citizenship_code = text,
+		            normalized_iso2 = text,
+		            exception_country = text,
+		            mapping_basis = text
+		        ],
+		        {
+		            {"ba", "bb", "Barbados", "Profile citizenship cross-check"},
+		            {"bu", "bg", "Bulgaria", "Profile citizenship cross-check"},
+		            {"cr", "hr", "Croatia", "Profile citizenship cross-check"},
+		            {"gu", "gg", "Guernsey", "Profile citizenship cross-check"},
+		            {"ic", "is", "Iceland", "Profile citizenship cross-check"},
+		            {"sl", "sk", "Slovakia", "Profile citizenship cross-check"},
+		            {"st", "kn", "St. Kitts and Nevis", "Baseline and profile cross-check"},
+		            {"ta", "tz", "Tanzania", "Profile citizenship cross-check"},
+		            {"zi", "zw", "Zimbabwe", "Profile citizenship cross-check"}
+		        }
+		    )
+		in
+		    Source
+	lineageTag: 2ac0911e-d995-424d-ba42-cc0d2329c44c
+	queryGroup: 03_Transformations
+
+expression stg_ISO3166CountryCodes =
+		let
+		  Source = src_ISO3166CountryCodes,
+		// 1. Explicit staging schema contract: {Original CSV Column, Target Staging Name}
+		    ColumnMap = {
+		        {"ISO3166-1-Alpha-2", "source_iso2"},
+		        {"ISO3166-1-Alpha-3", "source_iso3"},
+		        {"official_name_en", "source_iso_official_name_en"},
+		        {"CLDR display name", "source_iso_common_name"}
+		    },
+		    RequiredSourceCols = List.Transform(ColumnMap, each _{0}),
+		    TargetStagingCols = List.Transform(ColumnMap, each _{1}),
+		
+		    // 2. Keep only the 4 required columns, then rename them
+		    SelectedColumns = Table.SelectColumns(Source, RequiredSourceCols),
+		    RenamedColumns = Table.RenameColumns(SelectedColumns, ColumnMap),
+		
+		    // 3. Enforce text types, strip whitespace/control characters, and convert empty strings to null
+		    TypedColumns = Table.TransformColumnTypes(
+		        RenamedColumns,
+		        List.Transform(TargetStagingCols, each {_, type text})
+		    ),
+		    CleanedColumns = Table.TransformColumns(
+		        TypedColumns,
+		        List.Transform(
+		            TargetStagingCols,
+		            each {
+		                _,
+		                (val) =>
+		                    let
+		                        Trimmed = if val = null then null else Text.Trim(Text.Clean(val))
+		                    in
+		                        if Trimmed = "" then null else Trimmed,
+		                type text
+		            }
+		        )
+		    )
+		in
+		  CleanedColumns
+	lineageTag: cff4c938-7eef-4fa6-8bd1-cf8ad0429183
+	queryGroup: 02_Staging
+
