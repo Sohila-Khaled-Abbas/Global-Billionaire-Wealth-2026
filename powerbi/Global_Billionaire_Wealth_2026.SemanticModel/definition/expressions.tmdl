@@ -6001,7 +6001,7 @@ expression int_ForbesCountryISO2toISO3 =
 		let
 		    Source = int_ForbesCountryCodeNormalized,
 		
-		    // Normalize ISO2 lookup keys to uppercase, filter null/blank rows, and deduplicate before joining
+		    // Normalize ISO2 lookup keys, exclude null/blank rows, and deduplicate
 		    ValidIsoLookup = Table.Distinct(
 		        Table.SelectRows(
 		            Table.TransformColumns(
@@ -6030,7 +6030,7 @@ expression int_ForbesCountryISO2toISO3 =
 		        {"source_iso3", "source_iso_official_name_en", "source_iso_common_name"}
 		    ),
 		
-		    TypedColumns = Table.TransformColumnTypes(
+		    TypedIsoColumns = Table.TransformColumnTypes(
 		        ExpandedIso,
 		        {
 		            {"source_citizenship_code", type text},
@@ -6041,9 +6041,59 @@ expression int_ForbesCountryISO2toISO3 =
 		            {"source_iso_official_name_en", type text},
 		            {"source_iso_common_name", type text}
 		        }
+		    ),
+		
+		    // Prepare DimCountry lookup (project needed columns, normalize iso3, strip nulls, deduplicate)
+		    CleanDimCountry = Table.Distinct(
+		        Table.SelectRows(
+		            Table.TransformColumns(
+		                Table.SelectColumns(DimCountry, {"iso3", "country", "wb_country_name", "country_display_label"}),
+		                {
+		                    {"iso3", each if _ = null then null else Text.Upper(Text.Trim(Text.Clean(Text.From(_)))), type text}
+		                }
+		            ),
+		            each [iso3] <> null and [iso3] <> ""
+		        ),
+		        {"iso3"}
+		    ),
+		
+		    // Left Outer Join against DimCountry on source_iso3 = iso3
+		    MergedBaseline = Table.NestedJoin(
+		        TypedIsoColumns,
+		        {"source_iso3"},
+		        CleanDimCountry,
+		        {"iso3"},
+		        "BaselineMatch",
+		        JoinKind.LeftOuter
+		    ),
+		
+		    // Expand baseline fields with the baseline_ prefix
+		    ExpandedBaseline = Table.ExpandTableColumn(
+		        MergedBaseline,
+		        "BaselineMatch",
+		        {"country", "wb_country_name", "country_display_label"},
+		        {"baseline_country", "baseline_wb_country_name", "baseline_country_display_label"}
+		    ),
+		
+		    // Classify diagnostic reconciliation status without filtering unmatched rows
+		    AddedMatchStatus = Table.AddColumn(
+		        ExpandedBaseline,
+		        "baseline_match_status",
+		        each if [baseline_country] = null then "New to baseline dimension" else "Matched baseline dimension",
+		        type text
+		    ),
+		
+		    FinalTyped = Table.TransformColumnTypes(
+		        AddedMatchStatus,
+		        {
+		            {"baseline_country", type text},
+		            {"baseline_wb_country_name", type text},
+		            {"baseline_country_display_label", type text},
+		            {"baseline_match_status", type text}
+		        }
 		    )
 		in
-		    TypedColumns
+		    FinalTyped
 	lineageTag: 988f694d-78cb-4cfc-91e3-379db234531b
 	queryGroup: 03_Transformations
 

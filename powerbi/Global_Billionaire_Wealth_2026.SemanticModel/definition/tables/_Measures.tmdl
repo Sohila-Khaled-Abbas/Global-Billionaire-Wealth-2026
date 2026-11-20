@@ -25,3 +25,5 @@ table _Measures
 				in
 				  #"Removed Columns"
 
+	annotation PBI_ResultType = Table
+
