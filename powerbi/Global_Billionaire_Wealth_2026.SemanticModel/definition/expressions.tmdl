@@ -5611,3 +5611,115 @@ expression src_ForbesIndustryIndex =
 	lineageTag: c87c2035-7573-4b54-a3a8-c75c0c5e6f6e
 	queryGroup: 01_Source
 
+expression stg_ForbesCountryIndex =
+		let
+		    Source = src_ForbesCountryIndex,
+		
+		    // 1. Validate upstream Record and reference Record.ToTable columns dynamically by position
+		    ValidRecord = if Value.Is(Source, type record) then Source else error "Expected a Record from src_ForbesCountryIndex",
+		    RawTable = Record.ToTable(ValidRecord),
+		    DefaultCols = Table.ColumnNames(RawTable),
+		    KeyCol = DefaultCols{0},
+		    ValCol = DefaultCols{1},
+		
+		    // 2. Inspect Value dynamically: expand nested Record attributes if present, otherwise map as flat name
+		    SampleVal = List.First(List.RemoveNulls(Table.Column(RawTable, ValCol)), null),
+		    IsNestedRecord = Value.Is(SampleVal, type record),
+		    NestedFields = if IsNestedRecord then
+		        List.Distinct(List.Combine(
+		            List.Transform(
+		                List.Select(Table.Column(RawTable, ValCol), each Value.Is(_, type record)),
+		                each Record.FieldNames(_)
+		            )
+		        ))
+		    else
+		        {},
+		
+		    NormalizedTable = if IsNestedRecord and not List.IsEmpty(NestedFields) then
+		        let
+		            RenamedKey = Table.RenameColumns(RawTable, {{KeyCol, "source_country_index_code"}}),
+		            ExpandedVal = Table.ExpandRecordColumn(
+		                RenamedKey,
+		                ValCol,
+		                NestedFields,
+		                List.Transform(NestedFields, each "source_country_index_" & _)
+		            )
+		        in
+		            ExpandedVal
+		    else
+		        Table.RenameColumns(RawTable, {
+		            {KeyCol, "source_country_index_code"},
+		            {ValCol, "source_country_index_name"}
+		        }),
+		
+		    // 3. Dynamically enforce text types and strip control/whitespace characters across all columns
+		    AllCols = Table.ColumnNames(NormalizedTable),
+		    TypedTable = Table.TransformColumnTypes(
+		        NormalizedTable,
+		        List.Transform(AllCols, each {_, type text})
+		    ),
+		    CleanedTable = Table.TransformColumns(
+		        TypedTable,
+		        List.Transform(AllCols, each {_, each if _ = null then null else Text.Trim(Text.Clean(_)), type text})
+		    )
+		in
+		    CleanedTable
+	lineageTag: 41784432-5088-404c-b0b0-7a973241e545
+	queryGroup: 02_Staging
+
+expression stg_ForbesIndustryIndex =
+		let
+		    Source = src_ForbesIndustryIndex,
+		
+		    // 1. Validate upstream Record and reference Record.ToTable columns dynamically by position
+		    ValidRecord = if Value.Is(Source, type record) then Source else error "Expected a Record from src_ForbesIndustryIndex",
+		    RawTable = Record.ToTable(ValidRecord),
+		    DefaultCols = Table.ColumnNames(RawTable),
+		    KeyCol = DefaultCols{0},
+		    ValCol = DefaultCols{1},
+		
+		    // 2. Inspect Value dynamically: expand nested Record attributes if present, otherwise map as flat name
+		    SampleVal = List.First(List.RemoveNulls(Table.Column(RawTable, ValCol)), null),
+		    IsNestedRecord = Value.Is(SampleVal, type record),
+		    NestedFields = if IsNestedRecord then
+		        List.Distinct(List.Combine(
+		            List.Transform(
+		                List.Select(Table.Column(RawTable, ValCol), each Value.Is(_, type record)),
+		                each Record.FieldNames(_)
+		            )
+		        ))
+		    else
+		        {},
+		
+		    NormalizedTable = if IsNestedRecord and not List.IsEmpty(NestedFields) then
+		        let
+		            RenamedKey = Table.RenameColumns(RawTable, {{KeyCol, "source_industry_index_code"}}),
+		            ExpandedVal = Table.ExpandRecordColumn(
+		                RenamedKey,
+		                ValCol,
+		                NestedFields,
+		                List.Transform(NestedFields, each "source_industry_index_" & _)
+		            )
+		        in
+		            ExpandedVal
+		    else
+		        Table.RenameColumns(RawTable, {
+		            {KeyCol, "source_industry_index_code"},
+		            {ValCol, "source_industry_index_name"}
+		        }),
+		
+		    // 3. Dynamically enforce text types and strip control/whitespace characters across all columns
+		    AllCols = Table.ColumnNames(NormalizedTable),
+		    TypedTable = Table.TransformColumnTypes(
+		        NormalizedTable,
+		        List.Transform(AllCols, each {_, type text})
+		    ),
+		    CleanedTable = Table.TransformColumns(
+		        TypedTable,
+		        List.Transform(AllCols, each {_, each if _ = null then null else Text.Trim(Text.Clean(_)), type text})
+		    )
+		in
+		    CleanedTable
+	lineageTag: 739580b3-9a5d-430d-828f-55345b6eb821
+	queryGroup: 02_Staging
+
