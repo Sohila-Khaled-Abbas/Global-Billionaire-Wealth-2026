@@ -5480,23 +5480,44 @@ expression tmp_DimCountryEnrichmentValidation =
 
 expression src_ForbesLiveRoot =
 		let
-		    // Generate today's date in YYYY-MM-DD format (UTC avoids local machine vs. cloud service drift)
-		    TodayText = Date.ToText(Date.From(DateTimeZone.UtcNow()), "yyyy-MM-dd"),
+		    BaseUrl = "https://raw.githubusercontent.com",
+		    RequestHeaders = [Accept = "application/json"],
+		    RequestTimeout = #duration(0, 0, 5, 0),
 		
-		    // Use RelativePath so Power BI Service does not flag this as an unrefreshable dynamic data source
-		    Source = Web.Contents(
-		        "https://raw.githubusercontent.com",
+		    // 1. Read the authoritative latest published date inline from api/updated
+		    UpdatedBinary = Web.Contents(
+		        BaseUrl,
 		        [
-		            RelativePath = "komed3/rtb-api/main/api/list/rtb/" & TodayText,
-		            Timeout = #duration(0, 0, 5, 0),
-		            Headers = [Accept = "application/json"]
+		            RelativePath = "komed3/rtb-api/main/api/updated",
+		            Timeout = RequestTimeout,
+		            Headers = RequestHeaders
 		        ]
 		    ),
+		    CleanUpdatedText = Text.Trim(
+		        Text.FromBinary(UpdatedBinary, TextEncoding.Utf8),
+		        {" ", "#(cr)", "#(lf)", "#(tab)", """"}
+		    ),
+		    LatestSnapshotDate = Date.From(DateTimeZone.FromText(CleanUpdatedText, "en-US")),
+		    LatestDateText = Date.ToText(LatestSnapshotDate, "yyyy-MM-dd"),
 		
-		    // Parse the binary stream directly as JSON instead of splitting by line breaks
-		    ParsedJson = Json.Document(Source, 65001),
+		    // 2. Helper that forces JSON parsing inside the function so lazy HTTP 404s are caught by try...otherwise
+		    FetchSnapshot = (dateText as text) =>
+		        let
+		            RawBinary = Web.Contents(
+		                BaseUrl,
+		                [
+		                    RelativePath = "komed3/rtb-api/main/api/list/rtb/" & dateText,
+		                    Timeout = RequestTimeout,
+		                    Headers = RequestHeaders
+		                ]
+		            )
+		        in
+		            Json.Document(RawBinary, 65001),
 		
-		    // Convert to a table depending on whether the root JSON is an array (list) or an object (record)
+		    FallbackDateText = Date.ToText(Date.AddDays(LatestSnapshotDate, -1), "yyyy-MM-dd"),
+		    ParsedJson = try FetchSnapshot(LatestDateText) otherwise FetchSnapshot(FallbackDateText),
+		
+		    // 3. Convert root JSON payload into a table
 		    OutputTable = if Value.Is(ParsedJson, type list) then
 		        Table.FromList(ParsedJson, Splitter.SplitByNothing(), null, null, ExtraValues.Error)
 		    else
@@ -6098,4 +6119,250 @@ expression int_ForbesCountryISO2toISO3 =
 	queryGroup: 03_Transformations
 
 	annotation PBI_ResultType = Text
+
+expression qa_ForbesMissingIndustry =
+		let
+		    Source = stg_ForbesLive,
+		
+		    // 1. Project only the 5 required columns early to keep preview evaluation lightweight
+		    SelectedColumns = Table.SelectColumns(
+		        Source,
+		        {
+		            "source_rank",
+		            "forbes_uri",
+		            "source_person_name",
+		            "source_citizenship_code",
+		            "source_industry_list"
+		        }
+		    ),
+		
+		    // 2. Duplicate source_industry_list to inspect contents without mutating the raw list column
+		    DuplicatedIndustry = Table.DuplicateColumn(
+		        SelectedColumns,
+		        "source_industry_list",
+		        "industry_list_check"
+		    ),
+		
+		    // 3. Extract list values to "|" delimited text safely (guards against top-level nulls or scalars)
+		    ExtractedValues = Table.TransformColumns(
+		        DuplicatedIndustry,
+		        {
+		            {
+		                "industry_list_check",
+		                each
+		                    if _ = null then
+		                        null
+		                    else if Value.Is(_, type list) then
+		                        Text.Trim(Text.Combine(List.Transform(_, each if _ = null then "" else Text.From(_)), "|"))
+		                    else
+		                        Text.Trim(Text.From(_)),
+		                type text
+		            }
+		        }
+		    ),
+		
+		    // 4. Retain records where the serialized list is null or empty (4 rows on the baseline snapshot)
+		    FilteredMissing = Table.SelectRows(
+		        ExtractedValues,
+		        each [industry_list_check] = null or [industry_list_check] = ""
+		    ),
+		
+		    // 5. Drop the temporary check column, leaving source_industry_list intact for traceability
+		    RemovedHelper = Table.RemoveColumns(FilteredMissing, {"industry_list_check"})
+		in
+		    RemovedHelper
+	lineageTag: 9dd18c5e-7a66-4ef0-bf24-b6e21d4cafc4
+	queryGroup: '05_QA & Reconciliation'
+
+expression int_ForbesIndustryBridgeRaw =
+		let
+		    Source = stg_ForbesLive,
+		
+		    // Step 6.2: Project only the 5 required columns early
+		    SelectedColumns = Table.SelectColumns(
+		        Source,
+		        {
+		            "source_rank",
+		            "forbes_uri",
+		            "source_person_name",
+		            "source_citizenship_code",
+		            "source_industry_list"
+		        }
+		    ),
+		
+		    // Normalize cells to valid lists so null or unexpected scalar values do not crash expansion
+		    NormalizedLists = Table.TransformColumns(
+		        SelectedColumns,
+		        {
+		            {
+		                "source_industry_list",
+		                each if _ = null then {} else if Value.Is(_, type list) then _ else {_},
+		                type list
+		            }
+		        }
+		    ),
+		
+		    // Expand list elements to new rows and rename to source_industry_raw
+		    ExpandedIndustryRows = Table.ExpandListColumn(NormalizedLists, "source_industry_list"),
+		    RenamedColumn = Table.RenameColumns(
+		        ExpandedIndustryRows,
+		        {{"source_industry_list", "source_industry_raw"}}
+		    ),
+		
+		    // Cast to text and remove null/whitespace-only entries while leaving source_industry_raw untouched for auditing
+		    TypedRaw = Table.TransformColumnTypes(RenamedColumn, {{"source_industry_raw", type text}}),
+		    FilteredValid = Table.SelectRows(
+		        TypedRaw,
+		        each [source_industry_raw] <> null and Text.Trim([source_industry_raw]) <> ""
+		    ),
+		
+		    // Step 6.3: Duplicate into source_industry_key and apply Clean -> Trim -> Lowercase
+		    DuplicatedKey = Table.DuplicateColumn(
+		        FilteredValid,
+		        "source_industry_raw",
+		        "source_industry_key",
+		        type text
+		    ),
+		    NormalizedKey = Table.TransformColumns(
+		        DuplicatedKey,
+		        {
+		            {
+		                "source_industry_key",
+		                each if _ = null then null else Text.Lower(Text.Trim(Text.Clean(_))),
+		                type text
+		            }
+		        }
+		    )
+		in
+		    NormalizedKey
+	lineageTag: 21e5298e-2a26-44ba-bf72-d82d7cd33904
+	queryGroup: 03_Transformations
+
+expression int_DimIndustryLookup =
+		let
+		    Source = DimIndustry,
+		
+		    // Project only the existing industry column and enforce text type
+		    SelectedIndustry = Table.TransformColumnTypes(
+		        Table.SelectColumns(Source, {"industry"}),
+		        {{"industry", type text}}
+		    ),
+		
+		    // Duplicate into industry_match_key and apply Clean -> Trim -> Lowercase
+		    DuplicatedKey = Table.DuplicateColumn(
+		        SelectedIndustry,
+		        "industry",
+		        "industry_match_key",
+		        type text
+		    ),
+		    NormalizedKey = Table.TransformColumns(
+		        DuplicatedKey,
+		        {
+		            {
+		                "industry_match_key",
+		                each if _ = null then null else Text.Lower(Text.Trim(Text.Clean(_))),
+		                type text
+		            }
+		        }
+		    ),
+		
+		    // Exclude null/blank keys (prevents null = null false matches) and deduplicate (expected: 18 rows)
+		    ValidKeys = Table.SelectRows(
+		        NormalizedKey,
+		        each [industry_match_key] <> null and [industry_match_key] <> ""
+		    ),
+		    DistinctLookup = Table.Distinct(ValidKeys, {"industry_match_key"})
+		in
+		    DistinctLookup
+	lineageTag: c9095c07-59af-4051-996e-370d0b08601a
+	queryGroup: 03_Transformations
+
+expression int_ForbesIndustryMap =
+		let
+		    Source = int_ForbesIndustryBridgeRaw,
+		
+		    // Step 6.4: Isolate distinct normalized live industry keys (expected: 18 rows)
+		    SelectedKey = Table.SelectColumns(Source, {"source_industry_key"}),
+		    DistinctLiveKeys = Table.Distinct(
+		        Table.SelectRows(SelectedKey, each [source_industry_key] <> null and [source_industry_key] <> ""),
+		        {"source_industry_key"}
+		    ),
+		
+		    // Step 6.6: Buffer the 18-row dimension helper in memory for fast join resolution
+		    BufferedDimLookup = Table.Buffer(int_DimIndustryLookup),
+		
+		    MergedDim = Table.NestedJoin(
+		        DistinctLiveKeys,
+		        {"source_industry_key"},
+		        BufferedDimLookup,
+		        {"industry_match_key"},
+		        "DimMatch",
+		        JoinKind.LeftOuter
+		    ),
+		
+		    ExpandedCanonical = Table.ExpandTableColumn(
+		        MergedDim,
+		        "DimMatch",
+		        {"industry"},
+		        {"canonical_industry"}
+		    ),
+		
+		    TypedCanonical = Table.TransformColumnTypes(
+		        ExpandedCanonical,
+		        {
+		            {"source_industry_key", type text},
+		            {"canonical_industry", type text}
+		        }
+		    ),
+		
+		    // Classify reconciliation status without filtering out unmatched categories
+		    AddedMatchStatus = Table.AddColumn(
+		        TypedCanonical,
+		        "industry_match_status",
+		        each if [canonical_industry] = null then "Unmatched to DimIndustry" else "Matched to DimIndustry",
+		        type text
+		    )
+		in
+		    AddedMatchStatus
+	lineageTag: f909da43-c189-46d2-9f7e-19499ef3569f
+	queryGroup: 03_Transformations
+
+expression int_ForbesIndustryBridge =
+		let
+		    Source = int_ForbesIndustryBridgeRaw,
+		
+		    // Buffer the 18-row reconciliation map in memory so join probes do not re-scan it
+		    BufferedIndustryMap = Table.Buffer(
+		        Table.SelectColumns(
+		            int_ForbesIndustryMap,
+		            {"source_industry_key", "canonical_industry", "industry_match_status"}
+		        )
+		    ),
+		
+		    MergedMap = Table.NestedJoin(
+		        Source,
+		        {"source_industry_key"},
+		        BufferedIndustryMap,
+		        {"source_industry_key"},
+		        "MapMatch",
+		        JoinKind.LeftOuter
+		    ),
+		
+		    ExpandedBridge = Table.ExpandTableColumn(
+		        MergedMap,
+		        "MapMatch",
+		        {"canonical_industry", "industry_match_status"}
+		    ),
+		
+		    TypedBridge = Table.TransformColumnTypes(
+		        ExpandedBridge,
+		        {
+		            {"canonical_industry", type text},
+		            {"industry_match_status", type text}
+		        }
+		    )
+		in
+		    TypedBridge
+	lineageTag: 35f1e394-a0ec-443f-81b4-95ea466ddf60
+	queryGroup: 03_Transformations
 
