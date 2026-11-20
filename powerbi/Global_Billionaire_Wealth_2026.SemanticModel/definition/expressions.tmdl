@@ -5824,3 +5824,228 @@ expression stg_ISO3166CountryCodes =
 	lineageTag: cff4c938-7eef-4fa6-8bd1-cf8ad0429183
 	queryGroup: 02_Staging
 
+expression int_ForbesCountryCodeRawDistinct =
+		let
+		    Source = stg_ForbesLive,
+		
+		    // 1. Project only the raw citizenship code column
+		    SelectedColumn = Table.SelectColumns(Source, {"source_citizenship_code"}),
+		
+		    // 2. Enforce text type explicitly (prevents 'any' type leakage from JSON expansion)
+		    TypedText = Table.TransformColumnTypes(
+		        SelectedColumn,
+		        {{"source_citizenship_code", type text}}
+		    ),
+		
+		    // 3. Strip control characters/whitespace and normalize casing to match index & exception keys
+		    NormalizedCode = Table.TransformColumns(
+		        TypedText,
+		        {
+		            {
+		                "source_citizenship_code",
+		                each if _ = null then null else Text.Lower(Text.Trim(Text.Clean(_))),
+		                type text
+		            }
+		        }
+		    ),
+		
+		    // 4. Filter out nulls and empty strings AFTER trimming so whitespace-only values are caught
+		    FilteredValid = Table.SelectRows(
+		        NormalizedCode,
+		        each [source_citizenship_code] <> null and [source_citizenship_code] <> ""
+		    ),
+		
+		    // 5. Deduplicate on canonical lowercase key and sort deterministically
+		    DistinctCodes = Table.Distinct(FilteredValid, {"source_citizenship_code"}),
+		    SortedCodes = Table.Sort(DistinctCodes, {{"source_citizenship_code", Order.Ascending}})
+		in
+		    SortedCodes
+	lineageTag: d3fc0395-0888-4f05-b309-26c8aaca875b
+	queryGroup: 03_Transformations
+
+	annotation PBI_ResultType = Table
+
+expression int_ForbesCountryCodeExceptionsApplied =
+		let
+		    Source = int_ForbesCountryCodeRawDistinct,
+		
+		    // Normalize and deduplicate lookup keys on the reference table to prevent silent misses or row duplication
+		    CleanExceptions = Table.Distinct(
+		        Table.TransformColumns(
+		            ref_ForbesCountryCodeExceptions,
+		            {
+		                {"source_citizenship_code", each if _ = null then null else Text.Lower(Text.Trim(Text.Clean(_))), type text},
+		                {"normalized_iso2", each if _ = null then null else Text.Lower(Text.Trim(Text.Clean(_))), type text}
+		            }
+		        ),
+		        {"source_citizenship_code"}
+		    ),
+		
+		    MergedExceptions = Table.NestedJoin(
+		        Source,
+		        {"source_citizenship_code"},
+		        CleanExceptions,
+		        {"source_citizenship_code"},
+		        "ExceptionMatch",
+		        JoinKind.Inner
+		    ),
+		    ExpandedExceptions = Table.ExpandTableColumn(
+		        MergedExceptions,
+		        "ExceptionMatch",
+		        {"normalized_iso2", "exception_country", "mapping_basis"},
+		        {"canonical_iso2", "exception_country", "mapping_basis"}
+		    ),
+		    TypedColumns = Table.TransformColumnTypes(
+		        ExpandedExceptions,
+		        {
+		            {"source_citizenship_code", type text},
+		            {"canonical_iso2", type text},
+		            {"exception_country", type text},
+		            {"mapping_basis", type text}
+		        }
+		    )
+		in
+		    TypedColumns
+	lineageTag: 350614c6-57e2-485b-9176-8585e5685d0a
+	queryGroup: 03_Transformations
+
+	annotation PBI_ResultType = Table
+
+expression int_ForbesCountryCodeUnchanged =
+		let
+		    Source = int_ForbesCountryCodeRawDistinct,
+		
+		    // Normalize lookup keys on the reference table to match canonical lowercase keys
+		    CleanExceptions = Table.Distinct(
+		        Table.TransformColumns(
+		            ref_ForbesCountryCodeExceptions,
+		            {
+		                {"source_citizenship_code", each if _ = null then null else Text.Lower(Text.Trim(Text.Clean(_))), type text}
+		            }
+		        ),
+		        {"source_citizenship_code"}
+		    ),
+		
+		    // Left Anti join retains only codes that do not require an exception override
+		    AntiJoined = Table.NestedJoin(
+		        Source,
+		        {"source_citizenship_code"},
+		        CleanExceptions,
+		        {"source_citizenship_code"},
+		        "ExceptionMatch",
+		        JoinKind.LeftAnti
+		    ),
+		
+		    // Remove the empty nested join column so it does not carry into Table.Combine
+		    CleanedAntiJoin = Table.RemoveColumns(AntiJoined, {"ExceptionMatch"}),
+		
+		    // Duplicate source_citizenship_code as canonical_iso2 and enforce text types
+		    AddedCanonical = Table.DuplicateColumn(
+		        CleanedAntiJoin,
+		        "source_citizenship_code",
+		        "canonical_iso2",
+		        type text
+		    ),
+		    TypedColumns = Table.TransformColumnTypes(
+		        AddedCanonical,
+		        {
+		            {"source_citizenship_code", type text},
+		            {"canonical_iso2", type text}
+		        }
+		    )
+		in
+		    TypedColumns
+	lineageTag: de43a63e-5c2e-4618-b805-b3537d2f76f2
+	queryGroup: 03_Transformations
+
+	annotation PBI_ResultType = Table
+
+expression int_ForbesCountryCodeNormalized =
+		let
+		    // Append exception-mapped and unchanged branches (columns align by name; nulls fill missing fields)
+		    CombinedBranches = Table.Combine({
+		        int_ForbesCountryCodeExceptionsApplied,
+		        int_ForbesCountryCodeUnchanged
+		    }),
+		
+		    // Standardize canonical_iso2 to uppercase to align with ISO 3166-1 alpha-2 codes
+		    UppercasedCanonical = Table.TransformColumns(
+		        CombinedBranches,
+		        {
+		            {
+		                "canonical_iso2",
+		                each if _ = null then null else Text.Upper(Text.Trim(Text.Clean(_))),
+		                type text
+		            }
+		        }
+		    ),
+		
+		    // Explicitly enforce text types across all columns
+		    TypedColumns = Table.TransformColumnTypes(
+		        UppercasedCanonical,
+		        {
+		            {"source_citizenship_code", type text},
+		            {"canonical_iso2", type text},
+		            {"exception_country", type text},
+		            {"mapping_basis", type text}
+		        }
+		    )
+		in
+		    TypedColumns
+	lineageTag: d3e3b73d-e56c-4c4e-9ec1-b3be7b2c4780
+	queryGroup: 03_Transformations
+
+	annotation PBI_ResultType = Table
+
+expression int_ForbesCountryISO2toISO3 =
+		let
+		    Source = int_ForbesCountryCodeNormalized,
+		
+		    // Normalize ISO2 lookup keys to uppercase, filter null/blank rows, and deduplicate before joining
+		    ValidIsoLookup = Table.Distinct(
+		        Table.SelectRows(
+		            Table.TransformColumns(
+		                stg_ISO3166CountryCodes,
+		                {
+		                    {"source_iso2", each if _ = null then null else Text.Upper(Text.Trim(Text.Clean(_))), type text}
+		                }
+		            ),
+		            each [source_iso2] <> null and [source_iso2] <> ""
+		        ),
+		        {"source_iso2"}
+		    ),
+		
+		    MergedIso = Table.NestedJoin(
+		        Source,
+		        {"canonical_iso2"},
+		        ValidIsoLookup,
+		        {"source_iso2"},
+		        "IsoMatch",
+		        JoinKind.LeftOuter
+		    ),
+		
+		    ExpandedIso = Table.ExpandTableColumn(
+		        MergedIso,
+		        "IsoMatch",
+		        {"source_iso3", "source_iso_official_name_en", "source_iso_common_name"}
+		    ),
+		
+		    TypedColumns = Table.TransformColumnTypes(
+		        ExpandedIso,
+		        {
+		            {"source_citizenship_code", type text},
+		            {"canonical_iso2", type text},
+		            {"exception_country", type text},
+		            {"mapping_basis", type text},
+		            {"source_iso3", type text},
+		            {"source_iso_official_name_en", type text},
+		            {"source_iso_common_name", type text}
+		        }
+		    )
+		in
+		    TypedColumns
+	lineageTag: 988f694d-78cb-4cfc-91e3-379db234531b
+	queryGroup: 03_Transformations
+
+	annotation PBI_ResultType = Text
+
