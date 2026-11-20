@@ -5508,3 +5508,34 @@ expression src_ForbesLiveRoot =
 
 	annotation PBI_ResultType = Table
 
+expression stg_ForbesLive =
+		let
+		    Source = src_ForbesLiveRoot,
+		
+		    // 1. Locate the row containing a list of records dynamically instead of hardcoding index {4}
+		    ListRows = Table.SelectRows(
+		        Source,
+		        each Value.Is([Value], type list)
+		            and (try Value.Is(List.First([Value]), type record) otherwise false)
+		    ),
+		    Navigation = if Table.IsEmpty(ListRows) then {} else ListRows{0}[Value],
+		
+		    // 2. Convert the list of records into a single-column table
+		    #"Converted to table" = Table.FromList(Navigation, Splitter.SplitByNothing(), null, null, ExtraValues.Error),
+		
+		    // 3. Extract the union of all field names across every record (handles optional/sparse JSON keys)
+		    ValidRecords = List.Select(Navigation, each Value.Is(_, type record)),
+		    FieldNames = List.Distinct(List.Combine(List.Transform(ValidRecords, each Record.FieldNames(_)))),
+		
+		    // 4. Expand all discovered columns dynamically, guarding against empty payloads
+		    #"Expanded Column1" = if List.IsEmpty(FieldNames) then
+		        #table({}, {})
+		    else
+		        Table.ExpandRecordColumn(#"Converted to table", "Column1", FieldNames),
+		  #"Changed column type" = Table.TransformColumnTypes(#"Expanded Column1", {{"rank", Int64.Type}, {"uri", type text}, {"name", type text}, {"gender", type text}, {"age", Int64.Type}, {"networth", type number}, {"citizenship", type text}}),
+		  #"Renamed columns" = Table.RenameColumns(#"Changed column type", {{"rank", "source_rank"}, {"uri", "forbes_uri"}, {"name", "source_person_name"}, {"gender", "source_gender_code"}, {"age", "source_age_years"}, {"networth", "source_networth_usd_m"}, {"citizenship", "source_citizenship_iso2"}, {"industry", "source_industry_list"}, {"source", "source_wealth_list"}})
+		in
+		    #"Renamed columns"
+	lineageTag: c881530b-1dde-4817-b625-07b4f65c6559
+	queryGroup: 02_Staging
+
